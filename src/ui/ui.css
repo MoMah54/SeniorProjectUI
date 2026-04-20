@@ -1,0 +1,23 @@
+/* src/ui/ui.css */
+:root {
+    color-scheme: dark;
+}
+
+.ui-card {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.ui-card--hover {
+    transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        background 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        border-color 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ui-card--hover:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.14);
+}

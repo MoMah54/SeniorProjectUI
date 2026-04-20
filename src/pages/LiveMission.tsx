@@ -1,0 +1,634 @@
+// src/pages/LiveMission.tsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import DroneSimulationView from "../components/DroneSimulationView";
+import Card from "../ui/Card";
+import { colors, radius, spacing, typography } from "../ui/tokens";
+import type { Aircraft } from "../data/fleetStore";
+
+type Telemetry = {
+    battery: number;
+    altitude: number;
+    speed: number;
+    lat: number;
+    lng: number;
+    signal: number;
+    status: "Scanning" | "Holding" | "Returning" | "Landed";
+};
+
+type Detection = {
+    id: string;
+    label: "Crack" | "Dent" | "Corrosion";
+    severity: "Low" | "Medium" | "High";
+    confidence: number;
+    zone: string;
+    timestamp: string;
+};
+
+type MissionEvent = {
+    id: string;
+    time: string;
+    message: string;
+    severity: "Info" | "Warning" | "Critical";
+};
+
+export default function LiveMission({ aircraft }: { aircraft: Aircraft }) {
+    const [telemetry, setTelemetry] = useState<Telemetry>({
+        battery: 100,
+        altitude: 4.8,   // realistic: close-range inspection altitude 3–6 m
+        speed: 0.7,      // realistic: slow inspection crawl 0.4–1.2 m/s
+        lat: 25.2048,
+        lng: 55.2708,
+        signal: 97,
+        status: "Scanning",
+    });
+
+    const [missionTime, setMissionTime] = useState<number>(0);
+    const [paused, setPaused] = useState<boolean>(false);
+
+    const [detections, setDetections] = useState<Detection[]>([
+        {
+            id: "D-104",
+            label: "Crack",
+            severity: "High",
+            confidence: 0.91,
+            zone: "Forward fuselage",
+            timestamp: nowTime(),
+        },
+        {
+            id: "D-103",
+            label: "Dent",
+            severity: "Medium",
+            confidence: 0.82,
+            zone: "Wing root",
+            timestamp: nowTime(),
+        },
+    ]);
+
+    const [events, setEvents] = useState<MissionEvent[]>([
+        { id: "E-1", time: nowTime(), message: "Mission started.", severity: "Info" },
+        { id: "E-2", time: nowTime(), message: "Telemetry link stable.", severity: "Info" },
+    ]);
+
+    const homeRef = useRef<{ lat: number; lng: number } | null>(null);
+
+    function pushEvent(message: string, severity: MissionEvent["severity"]) {
+        const event: MissionEvent = {
+            id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            time: nowTime(),
+            message,
+            severity,
+        };
+        setEvents((prev) => [event, ...prev].slice(0, 8));
+    }
+
+    function pushDetection() {
+        const samples: Omit<Detection, "id" | "timestamp">[] = [
+            { label: "Crack", severity: "High", confidence: 0.91, zone: "Forward fuselage" },
+            { label: "Dent", severity: "Medium", confidence: 0.83, zone: "Engine cowling" },
+            { label: "Corrosion", severity: "Low", confidence: 0.74, zone: "Aft fuselage" },
+        ];
+
+        const picked = samples[Math.floor(Math.random() * samples.length)];
+
+        const next: Detection = {
+            id: `D-${Math.floor(100 + Math.random() * 900)}`,
+            timestamp: nowTime(),
+            ...picked,
+        };
+
+        setDetections((prev) => [next, ...prev].slice(0, 6));
+        pushEvent(
+            `${next.label} detected at ${next.zone} (${Math.round(next.confidence * 100)}% confidence).`,
+            next.severity === "High" ? "Warning" : "Info"
+        );
+    }
+
+    function togglePause() {
+        if (telemetry.status === "Returning" || telemetry.status === "Landed") return;
+
+        setPaused((prev) => {
+            const next = !prev;
+            setTelemetry((curr) => ({
+                ...curr,
+                speed: next ? 0 : 0.6,
+                status: next ? "Holding" : "Scanning",
+            }));
+            pushEvent(next ? "Drone hold position engaged." : "Drone resumed scan path.", "Info");
+            return next;
+        });
+    }
+
+    function returnToHome() {
+        if (telemetry.status === "Landed") return;
+
+        homeRef.current = {
+            lat: +(telemetry.lat - 0.0012).toFixed(6),
+            lng: +(telemetry.lng + 0.0014).toFixed(6),
+        };
+
+        setPaused(false);
+        setTelemetry((curr) => ({
+            ...curr,
+            status: "Returning",
+        }));
+        pushEvent("Return-to-home initiated.", "Warning");
+    }
+
+    useEffect(() => {
+        const id = window.setInterval(() => {
+            setMissionTime((prev) => prev + 1);
+
+            setTelemetry((prev) => {
+                if (prev.status === "Landed") return prev;
+
+                const home = homeRef.current;
+                const returning = prev.status === "Returning" && home;
+
+                let nextLat = prev.lat;
+                let nextLng = prev.lng;
+                let nextAlt = prev.altitude;
+                let nextSpeed = prev.speed;
+
+                if (returning) {
+                    // Realistic RTH: climb first to 12 m, then transit, then descend to land
+                    const climbTarget = 12;
+                    if (prev.altitude < climbTarget - 0.5) {
+                        nextAlt = clamp(prev.altitude + rand(1.2, 2.0), 0, climbTarget);
+                        nextSpeed = clamp(prev.speed + (1.8 - prev.speed) * 0.3, 0, 5);
+                    } else {
+                        nextLat = moveToward(prev.lat, home.lat, 0.12);
+                        nextLng = moveToward(prev.lng, home.lng, 0.12);
+                        nextAlt = clamp(prev.altitude - rand(0.3, 0.7), 0, climbTarget);
+                        nextSpeed = clamp(prev.speed + (3.5 - prev.speed) * 0.2, 0, 8);
+                    }
+
+                    const arrived = distDeg(nextLat, nextLng, home.lat, home.lng) < 0.00005;
+                    if (arrived && nextAlt <= 0.5) {
+                        pushEvent("Drone landed at home position.", "Info");
+                        homeRef.current = null;
+                        return {
+                            ...prev,
+                            lat: +nextLat.toFixed(6),
+                            lng: +nextLng.toFixed(6),
+                            altitude: 0,
+                            speed: 0,
+                            battery: clamp(prev.battery - 0.05, 0, 100),
+                            signal: clamp(prev.signal + rand(-1, 1), 0, 100),
+                            status: "Landed",
+                        };
+                    }
+                } else if (!paused) {
+                    // Realistic inspection drift: tiny GPS micro-movement at slow crawl speed
+                    nextLat = prev.lat + rand(-0.000004, 0.000004);
+                    nextLng = prev.lng + rand(-0.000004, 0.000004);
+                    // Altitude: very close to fuselage — 3.5–6.5 m
+                    nextAlt = clamp(prev.altitude + rand(-0.15, 0.15), 3.5, 6.5);
+                    // Speed: slow inspection crawl 0.4–1.2 m/s
+                    nextSpeed = clamp(prev.speed + rand(-0.08, 0.08), 0.4, 1.2);
+                }
+
+                // Battery: realistic 30-min flight = ~0.055%/s drain; holding = 0.018%/s
+                const nextBattery = clamp(prev.battery - (paused ? 0.018 : 0.055), 0, 100);
+                // Signal: strong and stable near ground station, minor fluctuation
+                const nextSignal = clamp(prev.signal + rand(-1, 1), 88, 99);
+
+                return {
+                    ...prev,
+                    lat: +nextLat.toFixed(6),
+                    lng: +nextLng.toFixed(6),
+                    altitude: +nextAlt.toFixed(1),
+                    speed: +nextSpeed.toFixed(1),
+                    battery: +nextBattery.toFixed(1),
+                    signal: Math.round(nextSignal),
+                };
+            });
+        }, 1000);
+
+        return () => window.clearInterval(id);
+    }, [paused]);
+
+    useEffect(() => {
+        const detectionTimer = window.setInterval(() => {
+            if (!paused && telemetry.status === "Scanning" && Math.random() < 0.35) {
+                pushDetection();
+            }
+        }, 6000);
+
+        return () => window.clearInterval(detectionTimer);
+    }, [paused, telemetry.status]);
+
+    const missionSummary = useMemo(() => {
+        const high = detections.filter((d) => d.severity === "High").length;
+        return {
+            total: detections.length,
+            high,
+        };
+    }, [detections]);
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
+            <div style={header}>
+                <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                        <h1 style={title}>Live Tracker</h1>
+                        <span style={aircraftBadge}>{aircraft.registration}</span>
+                    </div>
+                    <div style={{ color: colors.textSecondary, fontSize: 14 }}>
+                        Real-time drone tracking, telemetry, and defect monitoring for {aircraft.model}
+                    </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <StatusPill label={`Status: ${telemetry.status}`} tone={statusTone(telemetry.status)} />
+                    <StatusPill label={`Mission Time: ${formatDuration(missionTime)}`} tone="neutral" />
+                    <StatusPill label={`Detections: ${missionSummary.total}`} tone="info" />
+                </div>
+            </div>
+
+            <div style={mainGrid} className="lm-grid">
+                <Card>
+                    <div style={sectionTitle}>Aircraft Inspection View</div>
+                    <div style={sectionSub}>Drone position relative to {aircraft.registration} during live scan</div>
+
+                    <div style={{ height: spacing.md }} />
+
+                    <DroneSimulationView
+                        telemetry={telemetry}
+                        detections={detections}
+                        paused={paused}
+                    />
+
+                    <div style={{ height: spacing.md }} />
+
+                    <div style={buttonRow}>
+                        <button type="button" style={paused ? btnPrimary : btnSecondary} onClick={togglePause}>
+                            {paused ? "Resume Scan" : "Hold Position"}
+                        </button>
+
+                        <button type="button" style={btnWarn} onClick={returnToHome}>
+                            Return to Home
+                        </button>
+                    </div>
+                </Card>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
+                    <Card>
+                        <div style={sectionTitle}>Telemetry</div>
+                        <div style={sectionSub}>Live sensor data from the drone</div>
+
+                        <div style={{ height: spacing.md }} />
+
+                        <Metric label="Battery" value={`${telemetry.battery}%`} />
+                        <Bar value={telemetry.battery} tone={telemetry.battery < 20 ? "danger" : telemetry.battery < 40 ? "warn" : "ok"} />
+
+                        <div style={{ height: spacing.md }} />
+
+                        <Metric label="Signal" value={`${telemetry.signal}%`} />
+                        <Bar value={telemetry.signal} tone={telemetry.signal < 30 ? "danger" : telemetry.signal < 55 ? "warn" : "ok"} />
+
+                        <div style={{ height: spacing.md }} />
+
+                        <div style={miniGrid}>
+                            <MiniStat label="Altitude" value={`${telemetry.altitude} m`} />
+                            <MiniStat label="Speed" value={`${telemetry.speed} m/s`} />
+                            <MiniStat label="Latitude" value={`${telemetry.lat}`} mono />
+                            <MiniStat label="Longitude" value={`${telemetry.lng}`} mono />
+                        </div>
+                    </Card>
+
+                    <Card>
+                        <div style={sectionTitle}>Live Findings</div>
+                        <div style={sectionSub}>Anomalies detected during this inspection session</div>
+
+                        <div style={{ height: spacing.md }} />
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            {detections.map((d) => (
+                                <DetectionRow key={d.id} d={d} />
+                            ))}
+                        </div>
+                    </Card>
+
+                    <Card>
+                        <div style={sectionTitle}>Mission Events</div>
+                        <div style={sectionSub}>System and mission event log</div>
+
+                        <div style={{ height: spacing.md }} />
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            {events.map((e) => (
+                                <EventRow key={e.id} e={e} />
+                            ))}
+                        </div>
+                    </Card>
+                </div>
+            </div>
+
+            <style>{responsiveCss}</style>
+        </div>
+    );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+    return (
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ color: colors.textSecondary }}>{label}</div>
+            <div style={{ color: colors.textPrimary, fontWeight: 800 }}>{value}</div>
+        </div>
+    );
+}
+
+function MiniStat({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+    return (
+        <div style={miniBox}>
+            <div style={{ color: colors.textSecondary, fontSize: 12 }}>{label}</div>
+            <div
+                style={{
+                    marginTop: 8,
+                    color: colors.textPrimary,
+                    fontWeight: 800,
+                    fontFamily: mono ? typography.monoFamily : typography.fontFamily,
+                }}
+            >
+                {value}
+            </div>
+        </div>
+    );
+}
+
+function DetectionRow({ d }: { d: Detection }) {
+    const sev = severityStyle(d.severity);
+
+    return (
+        <div style={rowCard}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 900, color: colors.textPrimary }}>{d.label}</span>
+                    <span style={{ ...pillBase, background: sev.bg, borderColor: sev.border }}>
+                        <span style={{ ...dotBase, background: sev.dot }} />
+                        {d.severity}
+                    </span>
+                </div>
+                <span style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.monoFamily }}>
+                    {d.id}
+                </span>
+            </div>
+
+            <div style={{ marginTop: 8, color: colors.textSecondary, fontSize: 13 }}>
+                {d.zone} • {Math.round(d.confidence * 100)}% confidence • {d.timestamp}
+            </div>
+        </div>
+    );
+}
+
+function EventRow({ e }: { e: MissionEvent }) {
+    const tone = eventTone(e.severity);
+
+    return (
+        <div style={rowCard}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                <span style={{ ...pillBase, background: tone.bg, borderColor: tone.border }}>
+                    <span style={{ ...dotBase, background: tone.dot }} />
+                    {e.severity}
+                </span>
+                <span style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.monoFamily }}>
+                    {e.time}
+                </span>
+            </div>
+
+            <div style={{ marginTop: 8, color: colors.textPrimary, fontSize: 13 }}>{e.message}</div>
+        </div>
+    );
+}
+
+function StatusPill({
+    label,
+    tone,
+}: {
+    label: string;
+    tone: "success" | "warn" | "danger" | "info" | "neutral";
+}) {
+    const map = {
+        success: { bg: "rgba(61,220,151,0.12)", border: "rgba(61,220,151,0.28)", dot: colors.success },
+        warn: { bg: "rgba(247,201,72,0.12)", border: "rgba(247,201,72,0.28)", dot: colors.warning },
+        danger: { bg: "rgba(255,92,115,0.12)", border: "rgba(255,92,115,0.28)", dot: colors.danger },
+        info: { bg: "rgba(59,130,246,0.12)", border: "rgba(59,130,246,0.28)", dot: colors.primary },
+        neutral: { bg: "rgba(255,255,255,0.06)", border: "rgba(255,255,255,0.12)", dot: "rgba(255,255,255,0.55)" },
+    } as const;
+
+    const s = map[tone];
+
+    return (
+        <span style={{ ...pillBase, background: s.bg, borderColor: s.border }}>
+            <span style={{ ...dotBase, background: s.dot }} />
+            {label}
+        </span>
+    );
+}
+
+function Bar({ value, tone }: { value: number; tone: "ok" | "warn" | "danger" }) {
+    const pct = clamp(value, 0, 100);
+    const fill = tone === "danger" ? colors.danger : tone === "warn" ? colors.warning : colors.success;
+
+    return (
+        <div style={barTrack}>
+            <div style={{ ...barFill, width: `${pct}%`, background: fill }} />
+        </div>
+    );
+}
+
+function statusTone(status: Telemetry["status"]) {
+    if (status === "Scanning") return "success";
+    if (status === "Holding") return "info";
+    if (status === "Returning") return "warn";
+    return "neutral";
+}
+
+function eventTone(severity: MissionEvent["severity"]) {
+    if (severity === "Critical") return { bg: "rgba(255,92,115,0.12)", border: "rgba(255,92,115,0.28)", dot: colors.danger };
+    if (severity === "Warning") return { bg: "rgba(247,201,72,0.12)", border: "rgba(247,201,72,0.28)", dot: colors.warning };
+    return { bg: "rgba(59,130,246,0.12)", border: "rgba(59,130,246,0.28)", dot: colors.primary };
+}
+
+function severityStyle(sev: Detection["severity"]) {
+    if (sev === "High") return { bg: "rgba(255,92,115,0.12)", border: "rgba(255,92,115,0.28)", dot: colors.danger };
+    if (sev === "Medium") return { bg: "rgba(247,201,72,0.12)", border: "rgba(247,201,72,0.28)", dot: colors.warning };
+    return { bg: "rgba(61,220,151,0.12)", border: "rgba(61,220,151,0.28)", dot: colors.success };
+}
+
+function moveToward(current: number, target: number, factor: number) {
+    return current + (target - current) * factor;
+}
+
+function distDeg(lat1: number, lng1: number, lat2: number, lng2: number) {
+    const dLat = lat2 - lat1;
+    const dLng = lng2 - lng1;
+    return Math.sqrt(dLat * dLat + dLng * dLng);
+}
+
+function clamp(v: number, min: number, max: number) {
+    return Math.max(min, Math.min(max, v));
+}
+
+function rand(min: number, max: number) {
+    return Math.random() * (max - min) + min;
+}
+
+function formatDuration(totalSeconds: number) {
+    const mm = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+    const ss = String(totalSeconds % 60).padStart(2, "0");
+    return `${mm}:${ss}`;
+}
+
+function nowTime() {
+    const d = new Date();
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+const header: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "end",
+    gap: spacing.lg,
+};
+
+const title: React.CSSProperties = {
+    margin: 0,
+    fontSize: 26,
+    fontWeight: 700,
+    color: colors.textPrimary,
+};
+
+const aircraftBadge: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "4px 12px",
+    borderRadius: 999,
+    background: "rgba(61,220,151,0.10)",
+    border: "1px solid rgba(61,220,151,0.28)",
+    color: colors.success,
+    fontSize: 13,
+    fontWeight: 700,
+    letterSpacing: "0.5px",
+};
+
+const mainGrid: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "1.45fr 1fr",
+    gap: spacing.lg,
+    alignItems: "start",
+};
+
+const sectionTitle: React.CSSProperties = {
+    fontWeight: 900,
+    color: colors.textPrimary,
+    fontSize: 16,
+};
+
+const sectionSub: React.CSSProperties = {
+    marginTop: 6,
+    color: colors.textSecondary,
+    fontSize: 13,
+};
+
+const buttonRow: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: spacing.md,
+};
+
+const miniGrid: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: spacing.md,
+};
+
+const rowCard: React.CSSProperties = {
+    padding: 12,
+    borderRadius: 12,
+    border: `1px solid ${colors.border}`,
+    background: colors.surface2,
+};
+
+const miniBox: React.CSSProperties = {
+    padding: 12,
+    borderRadius: 12,
+    border: `1px solid ${colors.border}`,
+    background: "rgba(255,255,255,0.04)",
+};
+
+const pillBase: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "5px 10px",
+    borderRadius: radius.pill,
+    border: `1px solid ${colors.border}`,
+    background: "rgba(255,255,255,0.06)",
+    color: colors.textSecondary,
+    fontSize: 12,
+    whiteSpace: "nowrap",
+};
+
+const dotBase: React.CSSProperties = {
+    width: 6,
+    height: 6,
+    borderRadius: radius.pill,
+    display: "inline-block",
+};
+
+const barTrack: React.CSSProperties = {
+    height: 10,
+    borderRadius: radius.pill,
+    background: colors.background,
+    border: `1px solid ${colors.border}`,
+    overflow: "hidden",
+};
+
+const barFill: React.CSSProperties = {
+    height: "100%",
+    borderRadius: radius.pill,
+    transition: "width 260ms ease",
+};
+
+const btnPrimary: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(59,130,246,0.40)",
+    background: "rgba(59,130,246,0.22)",
+    color: "rgba(255,255,255,0.92)",
+    cursor: "pointer",
+    fontWeight: typography.weight.bold,
+    fontFamily: typography.fontFamily,
+};
+
+const btnSecondary: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: `1px solid ${colors.border}`,
+    background: "rgba(255,255,255,0.06)",
+    color: colors.textPrimary,
+    cursor: "pointer",
+    fontWeight: typography.weight.semibold,
+    fontFamily: typography.fontFamily,
+};
+
+const btnWarn: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(247,201,72,0.32)",
+    background: "rgba(247,201,72,0.12)",
+    color: colors.textPrimary,
+    cursor: "pointer",
+    fontWeight: typography.weight.bold,
+    fontFamily: typography.fontFamily,
+};
+
+const responsiveCss = `
+  @media (max-width: 1100px) {
+    .lm-grid { grid-template-columns: 1fr !important; }
+  }
+`;
