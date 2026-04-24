@@ -58,7 +58,7 @@ export default function Register({ onRegistered, onGoLogin, onBack }: Props) {
         .eq("id", data.user.id);
 
       setLoading(false);
-      onRegistered({ id: data.user.id, email: data.user.email ?? "", name: name.trim(), role });
+      onRegistered({ id: data.user.id, email: data.user.email ?? "", name: name.trim(), role, joinedAt: data.user.created_at ?? new Date().toISOString() });
     }
   }
 
