@@ -59,6 +59,7 @@ export default function Login({ onLogin, onGoRegister, onBack }: Props) {
         email: data.user.email ?? "",
         name: profile?.full_name ?? data.user.email ?? "",
         role: profile?.role ?? "Pilot",
+        joinedAt: data.user.created_at ?? new Date().toISOString(),
       });
     }
   }
