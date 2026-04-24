@@ -42,12 +42,24 @@ export default function Login({ onLogin, onGoRegister, onBack }: Props) {
     if (authError) {
       setError(authError.message);
     } else if (data.user) {
+      // Fetch their role and name from the profiles table
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, role")
+        .eq("id", data.user.id)
+        .single();
+
       await supabase
         .from("profiles")
         .update({ last_login: new Date().toISOString() })
         .eq("id", data.user.id);
 
-      onLogin({ id: data.user.id, email: data.user.email ?? "", role: "engineer" });
+      onLogin({
+        id: data.user.id,
+        email: data.user.email ?? "",
+        name: profile?.full_name ?? data.user.email ?? "",
+        role: profile?.role ?? "Pilot",
+      });
     }
   }
 
