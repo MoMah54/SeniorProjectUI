@@ -115,7 +115,7 @@ export default function DetectionView({ aircraft, detections }: Props) {
               </span>
             </div>
 
-            <CameraCanvas detection={selected} detIdx={selectedIdx} />
+            <CameraFrame detection={selected} detIdx={selectedIdx} />
 
             <div style={navRow}>
               <button
@@ -163,7 +163,66 @@ export default function DetectionView({ aircraft, detections }: Props) {
   );
 }
 
-// ── Camera canvas ─────────────────────────────────────────────────────────────
+// ── Camera frame — real image if available, animated canvas otherwise ─────────
+
+function CameraFrame({ detection, detIdx }: { detection: LiveDetection; detIdx: number }) {
+  const [imgError, setImgError] = React.useState(false);
+
+  // Reset error state when detection changes
+  React.useEffect(() => { setImgError(false); }, [detection.imageFile]);
+
+  // Show the real prediction image when available and not broken
+  if (detection.imageFile && !imgError) {
+    const sev = detection.severity;
+    const sevColor = sev === "High" ? "#ff5c73" : sev === "Medium" ? "#f7c948" : "#3ddc97";
+    const detId = `D-${String(detIdx + 1).padStart(3, "0")}`;
+    return (
+      <div style={{ position: "relative", width: "100%", lineHeight: 0 }}>
+        <img
+          src={`/predictions/${detection.imageFile}`}
+          alt={`YOLOv11 detection ${detId}`}
+          onError={() => setImgError(true)}
+          style={{ width: "100%", height: "auto", display: "block", borderRadius: 0 }}
+        />
+        {/* HUD overlay — detection ID + confidence badge */}
+        <div style={{
+          position: "absolute", top: 10, left: 10,
+          background: `${sevColor}dd`,
+          color: "#000", fontFamily: "monospace",
+          fontSize: 11, fontWeight: 700,
+          padding: "3px 9px", borderRadius: 4, letterSpacing: "0.4px",
+          pointerEvents: "none",
+        }}>
+          {detId} &nbsp;·&nbsp; {detection.label.toUpperCase()} &nbsp;·&nbsp; {Math.round(detection.confidence * 100)}%
+        </div>
+        {/* Severity label top-right */}
+        <div style={{
+          position: "absolute", top: 10, right: 10,
+          background: "rgba(0,0,0,0.72)",
+          color: sevColor, fontFamily: "monospace",
+          fontSize: 10, fontWeight: 700,
+          padding: "3px 8px", borderRadius: 4, letterSpacing: "0.8px",
+          pointerEvents: "none",
+        }}>
+          {sev.toUpperCase()}
+        </div>
+        {/* Zone label bottom-left */}
+        <div style={{
+          position: "absolute", bottom: 10, left: 10,
+          color: "rgba(255,255,255,0.55)", fontFamily: "monospace",
+          fontSize: 9, letterSpacing: "0.5px",
+          background: "rgba(0,0,0,0.55)", padding: "2px 7px", borderRadius: 3,
+          pointerEvents: "none",
+        }}>
+          ZONE: {detection.zone.toUpperCase()}
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback: animated canvas simulation (no imageFile, or image failed to load)
+  return <CameraCanvas detection={detection} detIdx={detIdx} />;
+}
 
 function CameraCanvas({ detection, detIdx }: { detection: LiveDetection; detIdx: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -258,7 +317,6 @@ function CameraCanvas({ detection, detIdx }: { detection: LiveDetection; detIdx:
       ctx.fillText(tag, bx + 7, tagY + 12);
 
       // ── HUD overlays ────────────────────────────────────────────────────
-      // Corner brackets (frame edges)
       const hm = 8, hl = 14;
       ctx.strokeStyle = "rgba(56,189,248,0.30)";
       ctx.lineWidth = 1.5;
@@ -267,13 +325,11 @@ function CameraCanvas({ detection, detIdx }: { detection: LiveDetection; detIdx:
       ctx.beginPath(); ctx.moveTo(hm, H - hm - hl); ctx.lineTo(hm, H - hm); ctx.lineTo(hm + hl, H - hm); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(W - hm - hl, H - hm); ctx.lineTo(W - hm, H - hm); ctx.lineTo(W - hm, H - hm - hl); ctx.stroke();
 
-      // Bottom-left: zone label
       ctx.font      = "9px monospace";
       ctx.fillStyle = "rgba(255,255,255,0.36)";
       ctx.textAlign = "left";
       ctx.fillText(`ZONE: ${detection.zone.toUpperCase()}`, 10, H - 8);
 
-      // Top-right: severity
       ctx.font      = "bold 10px monospace";
       ctx.textAlign = "right";
       ctx.fillStyle = `rgba(${r},${g},${b},0.90)`;

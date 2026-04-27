@@ -13,7 +13,7 @@ interface Telemetry {
 
 interface Detection {
   id: string;
-  label: "Crack" | "Dent" | "Corrosion";
+  label: "Crack" | "Dent" | "Corrosion" | "Scratch" | "Missing Rivet" | "Paint Damage";
   severity: "Low" | "Medium" | "High";
   confidence: number;
   zone: string;

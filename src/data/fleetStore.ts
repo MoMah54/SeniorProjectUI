@@ -3,7 +3,7 @@
 // New flight records created during live missions are persisted to localStorage.
 
 export type AircraftStatus = "Active" | "In Maintenance" | "Grounded";
-export type FindingType    = "Crack" | "Dent" | "Corrosion";
+export type FindingType    = "Crack" | "Dent" | "Corrosion" | "Scratch" | "Missing Rivet" | "Paint Damage";
 export type Severity       = "Low" | "Medium" | "High";
 export type FlightStatus   = "Completed" | "Pending Review" | "Archived";
 
@@ -30,6 +30,10 @@ export interface LiveDetection {
   confidence: number;
   zone: string;
   timestamp: string;
+  /** Filename of the YOLOv11 prediction image in public/predictions/ */
+  imageFile?: string;
+  /** Bounding box [x1, y1, x2, y2] in original image pixels */
+  bbox?: [number, number, number, number];
 }
 
 // ── Historical types ──────────────────────────────────────────────────────────
