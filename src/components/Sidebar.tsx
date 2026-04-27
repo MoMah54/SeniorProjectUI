@@ -47,7 +47,7 @@ const ROLE_COLOR: Record<User["role"], string> = {
 };
 
 /** Returns true when this nav item should be inaccessible given current mission phase */
-function isLocked(page: AppPage, phase: "idle" | "briefing" | "live" | "complete", role: User["role"]): boolean {
+function isLocked(page: AppPage, phase: "idle" | "briefing" | "live" | "complete", _role: User["role"]): boolean {
   // Live Tracker: only unlocked once the drone has actually been launched
   if (page === "live")      return phase !== "live";
   // Detection View: always accessible — shows per-aircraft pre-loaded findings

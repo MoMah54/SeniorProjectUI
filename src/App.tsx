@@ -301,7 +301,7 @@ export default function App() {
 
         {page === "review" && (
           <ResultsReview
-            missionDetections={currentMission?.detections ?? DEMO_DETECTIONS}
+            missionDetections={currentMission?.detections ?? getDetectionsForAircraft(selectedAircraftId)}
             missionAircraftId={selectedAircraftId}
             onGoHistory={() => setPage("history")}
           />
