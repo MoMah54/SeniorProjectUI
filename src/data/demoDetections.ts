@@ -183,6 +183,52 @@ const EBA: LiveDetection[] = [
   },
 ];
 
+// ── SIM-001  (ac-006) — Simulation Research Aircraft ─────────────────────────
+//
+// Images: synthetic 3D renders (img_0xxxx_png.rf.xxx.jpg) from public/predictions/
+// Zones: computed directly from image_surface_coordinates.csv × regions.json.
+//   All 493 simulated camera positions fall inside the Fuselage bounding box
+//   (x ∈ [-3.10, 3.10], y ∈ [-32.28, 34.04], z ∈ [2.57, 8.90]) — real zone data.
+const SIM: LiveDetection[] = [
+  {
+    id: "SIM-001", label: "Crack", severity: "High", confidence: 0.920,
+    zone: "Fuselage", timestamp: "10:02:14",
+    imageFile: "img_00000_png.rf.9bd40fe5fd8c2501cf0a34cfc47a2e33.jpg",
+    bbox: [213.70, 201.26, 263.86, 246.18],
+  },
+  {
+    id: "SIM-002", label: "Crack", severity: "High", confidence: 0.912,
+    zone: "Fuselage", timestamp: "10:04:38",
+    imageFile: "img_00007_png.rf.6d56ceb2bdb65b5762f2c57895b5d3b0.jpg",
+    bbox: [202.70, 185.84, 247.82, 226.04],
+  },
+  {
+    // Second crack in same frame as SIM-002 — co-detection demo for synthetic data
+    id: "SIM-003", label: "Crack", severity: "High", confidence: 0.877,
+    zone: "Fuselage", timestamp: "10:04:38",
+    imageFile: "img_00007_png.rf.6d56ceb2bdb65b5762f2c57895b5d3b0.jpg",
+    bbox: [318.97, 208.58, 359.74, 228.91],
+  },
+  {
+    id: "SIM-004", label: "Crack", severity: "High", confidence: 0.929,
+    zone: "Fuselage", timestamp: "09:18:55",
+    imageFile: "img_00019_png.rf.60c11881b849f1011bbcdbfb8130f6f3.jpg",
+    bbox: [286.77, 360.66, 333.60, 412.49],
+  },
+  {
+    id: "SIM-005", label: "Crack", severity: "High", confidence: 0.915,
+    zone: "Fuselage", timestamp: "09:22:11",
+    imageFile: "img_00025_png.rf.c3ebb97120c1d952e6a879fdb86c2295.jpg",
+    bbox: [219.63, 206.20, 294.59, 283.51],
+  },
+  {
+    id: "SIM-006", label: "Crack", severity: "Medium", confidence: 0.903,
+    zone: "Fuselage", timestamp: "11:05:42",
+    imageFile: "img_00028_png.rf.d7348f602add1e282f8e68af57cbb0bb.jpg",
+    bbox: [320.76, 226.93, 397.62, 265.31],
+  },
+];
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export const AIRCRAFT_DETECTIONS: Record<string, LiveDetection[]> = {
@@ -191,6 +237,7 @@ export const AIRCRAFT_DETECTIONS: Record<string, LiveDetection[]> = {
   "ac-003": EWA,
   "ac-004": EEF,
   "ac-005": EBA,
+  "ac-006": SIM,
 };
 
 export function getDetectionsForAircraft(aircraftId: string): LiveDetection[] {
