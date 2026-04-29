@@ -20,7 +20,7 @@ interface CheckItem {
 
 const CHECKS: CheckItem[] = [
   { label: "Drone battery level", value: "100% — Full charge", status: "ok" },
-  { label: "Camera system", value: "4K sensor — Ready", status: "ok" },
+  { label: "Camera system", value: "Camera sensor — Ready", status: "ok" },
   { label: "GPS & positioning", value: "12 satellites locked", status: "ok" },
   { label: "SD card storage", value: "64 GB — Available", status: "ok" },
   { label: "Comms link", value: "Encrypted — 28 dBm", status: "ok" },
