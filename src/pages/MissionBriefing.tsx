@@ -22,9 +22,8 @@ const CHECKS: CheckItem[] = [
   { label: "Drone battery level", value: "100% — Full charge", status: "ok" },
   { label: "Camera system", value: "4K sensor — Ready", status: "ok" },
   { label: "GPS & positioning", value: "12 satellites locked", status: "ok" },
-  { label: "Image storage", value: "64 GB — Available", status: "ok" },
+  { label: "SD card storage", value: "64 GB — Available", status: "ok" },
   { label: "Comms link", value: "Encrypted — 28 dBm", status: "ok" },
-  { label: "Image transfer protocol", value: "USB / Wi-Fi — Ready", status: "ok" },
   { label: "Aircraft documentation", value: "MSN retrieved", status: "ok" },
 ];
 
