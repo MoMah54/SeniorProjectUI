@@ -186,44 +186,60 @@ const EBA: LiveDetection[] = [
 // ── SIM-001  (ac-006) — Simulation Research Aircraft ─────────────────────────
 //
 // Images: synthetic 3D renders (img_0xxxx_png.rf.xxx.jpg) from public/predictions/
-// Zones: computed directly from image_surface_coordinates.csv × regions.json.
-//   All 493 simulated camera positions fall inside the Fuselage bounding box
-//   (x ∈ [-3.10, 3.10], y ∈ [-32.28, 34.04], z ∈ [2.57, 8.90]) — real zone data.
+//
+// Zone mapping methodology (image_coordinates_labeled.csv):
+//   Each img_N was captured at frame_{(N+6)×10} of the drone flight path.
+//   The labeled CSV records the drone's 3-D position and aircraft_region at every
+//   frame, so we read the zone directly from that file:
+//
+//     img_00000 → frame_00060 (t=6 s)  → Bottom loop → "front/nose-side – left"
+//     img_00007 → frame_00130 (t=13 s) → Bottom loop → "mid-body – left"
+//     img_00019 → frame_00250 (t=25 s) → Bottom loop → "rear-body – right"
+//     img_00025 → frame_00310 (t=31 s) → Bottom loop → "mid-body – right"
+//     img_00028 → frame_00340 (t=34 s) → Bottom loop → "front/nose-side – right"
+//
+//   All five source frames fall within the "Bottom loop" phase (t ∈ [6, 37] s,
+//   z = −0.20 m), which covers the lower fuselage / underside of the aircraft.
 const SIM: LiveDetection[] = [
   {
+    // frame_00060 → "Lower fuselage / underside - front/nose-side - left side"
     id: "SIM-001", label: "Crack", severity: "High", confidence: 0.920,
-    zone: "Fuselage", timestamp: "10:02:14",
+    zone: "Lower Fuselage — Nose Left", timestamp: "10:02:14",
     imageFile: "img_00000_png.rf.9bd40fe5fd8c2501cf0a34cfc47a2e33.jpg",
     bbox: [213.70, 201.26, 263.86, 246.18],
   },
   {
+    // frame_00130 → "Lower fuselage / underside - mid-body - left side"
     id: "SIM-002", label: "Crack", severity: "High", confidence: 0.912,
-    zone: "Fuselage", timestamp: "10:04:38",
+    zone: "Lower Fuselage — Mid Left", timestamp: "10:04:38",
     imageFile: "img_00007_png.rf.6d56ceb2bdb65b5762f2c57895b5d3b0.jpg",
     bbox: [202.70, 185.84, 247.82, 226.04],
   },
   {
-    // Second crack in same frame as SIM-002 — co-detection demo for synthetic data
+    // Second crack detected in the same frame as SIM-002 — co-detection demo
     id: "SIM-003", label: "Crack", severity: "High", confidence: 0.877,
-    zone: "Fuselage", timestamp: "10:04:38",
+    zone: "Lower Fuselage — Mid Left", timestamp: "10:04:38",
     imageFile: "img_00007_png.rf.6d56ceb2bdb65b5762f2c57895b5d3b0.jpg",
     bbox: [318.97, 208.58, 359.74, 228.91],
   },
   {
+    // frame_00250 → "Lower fuselage / underside - rear-body/tail-side - right side"
     id: "SIM-004", label: "Crack", severity: "High", confidence: 0.929,
-    zone: "Fuselage", timestamp: "09:18:55",
+    zone: "Lower Fuselage — Rear Right", timestamp: "09:18:55",
     imageFile: "img_00019_png.rf.60c11881b849f1011bbcdbfb8130f6f3.jpg",
     bbox: [286.77, 360.66, 333.60, 412.49],
   },
   {
+    // frame_00310 → "Lower fuselage / underside - mid-body - right side"
     id: "SIM-005", label: "Crack", severity: "High", confidence: 0.915,
-    zone: "Fuselage", timestamp: "09:22:11",
+    zone: "Lower Fuselage — Mid Right", timestamp: "09:22:11",
     imageFile: "img_00025_png.rf.c3ebb97120c1d952e6a879fdb86c2295.jpg",
     bbox: [219.63, 206.20, 294.59, 283.51],
   },
   {
+    // frame_00340 → "Lower fuselage / underside - front/nose-side - right side"
     id: "SIM-006", label: "Crack", severity: "Medium", confidence: 0.903,
-    zone: "Fuselage", timestamp: "11:05:42",
+    zone: "Lower Fuselage — Nose Right", timestamp: "11:05:42",
     imageFile: "img_00028_png.rf.d7348f602add1e282f8e68af57cbb0bb.jpg",
     bbox: [320.76, 226.93, 397.62, 265.31],
   },
