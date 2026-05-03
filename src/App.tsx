@@ -228,9 +228,13 @@ export default function App() {
           />
         )}
 
-        {/* ── Live Tracker — keep ALL live missions mounted; only show the active one ── */}
-        {page === "live" && liveMissionIds.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
+        {/* ── Live Tracker ─────────────────────────────────────────────────────────
+             IMPORTANT: this block is always mounted while missions are live,
+             and only hidden via CSS when the user navigates away.
+             Unmounting would destroy all React state (battery, timers, drone
+             phase) — keeping it mounted preserves progress across page changes. */}
+        {liveMissionIds.length > 0 && (
+          <div style={{ display: page === "live" ? "flex" : "none", flexDirection: "column", gap: spacing.lg }}>
 
             {/* Multi-mission tab bar — only shown when >1 aircraft in the air */}
             {liveMissionIds.length > 1 && (
@@ -265,8 +269,7 @@ export default function App() {
               </div>
             )}
 
-            {/* Render every live mission — hidden ones stay mounted so battery/signal
-                don't reset when switching tabs */}
+            {/* Each live mission stays mounted; only the active one is visible */}
             {liveMissionIds.map((id) => {
               const ac = FLEET.find((a) => a.id === id) ?? selectedAircraft;
               return (
