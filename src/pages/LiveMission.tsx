@@ -260,16 +260,6 @@ export default function LiveMission({ aircraft, pilotName: _pilotName = "Unknown
                             {paused ? "Resume Scan" : "Hold Position"}
                         </button>
 
-                        {/* Return Home — triggers normal landing + mission complete */}
-                        <button
-                            type="button"
-                            style={btnWarn}
-                            onClick={returnToHome}
-                            disabled={telemetry.status === "Returning" || telemetry.status === "Landed"}
-                        >
-                            Return Home
-                        </button>
-
                         {/* Abort — two-step confirmation, always available */}
                         <button
                             type="button"
@@ -536,7 +526,7 @@ const sectionSub: React.CSSProperties = {
 
 const buttonRow: React.CSSProperties = {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr 1fr",
+    gridTemplateColumns: "1fr 1fr",
     gap: spacing.md,
 };
 

@@ -1,12 +1,13 @@
 // src/pages/ResultsReview.tsx
-// Shows findings for any aircraft in the fleet.
-// Aircraft switcher tabs let the user pick which plane to review.
-// Live mission detections are merged in when viewing the mission aircraft.
+// Shows YOLOv11 detection findings for any aircraft in the fleet.
+// Source of truth: getDetectionsForAircraft() from demoDetections.ts — fixed per-aircraft
+// YOLOv11 output.  No localStorage / flight history merging here; counts are always stable.
 import React, { useEffect, useMemo, useState } from "react";
 import Card from "../ui/Card";
 import { colors, radius, spacing, typography } from "../ui/tokens";
-import { FLEET, getAircraftFlights } from "../data/fleetStore";
+import { FLEET } from "../data/fleetStore";
 import type { Aircraft, LiveDetection } from "../data/fleetStore";
+import { getDetectionsForAircraft } from "../data/demoDetections";
 
 // ── Local types ───────────────────────────────────────────────────────────────
 
@@ -51,40 +52,28 @@ export default function ResultsReview({ missionDetections, missionAircraftId, on
   const [severityFilter, setSeverityFilter] = useState<"All" | Severity>("All");
   const [showResolved, setShowResolved]   = useState(true);
 
-  // Reload findings whenever the selected aircraft changes
+  // Reload findings whenever the selected aircraft changes.
+  // Source of truth: getDetectionsForAircraft() — fixed YOLOv11 output per aircraft.
+  // If the selected aircraft is the one currently being inspected AND we already
+  // have live detections streaming in, show those instead (they match the same IDs).
   useEffect(() => {
-    const historical: Finding[] = getAircraftFlights(selectedAircraftId)
-      .flatMap((f) => f.findings)
-      .map((hf) => ({
-        id:         hf.id,
-        type:       hf.type,
-        severity:   hf.severity,
-        confidence: hf.confidence,
-        zone:       hf.zone,
-        timestamp:  hf.timestamp,
-        notes:      hf.notes,
-        resolved:   hf.resolved,
-      }));
+    const baseDets = getDetectionsForAircraft(selectedAircraftId);
+    const isCurrentMission =
+      selectedAircraftId === missionAircraftId && missionDetections.length > 0;
+    const sourceDets = isCurrentMission ? missionDetections : baseDets;
 
-    // Merge live detections for this aircraft (exclude any already saved to history)
-    const historicalIds = new Set(historical.map((f) => f.id));
-    const live: Finding[] = selectedAircraftId === missionAircraftId
-      ? missionDetections
-          .filter((d) => !historicalIds.has(d.id))
-          .map((d, i) => ({
-            id:         d.id || `live-${i}`,
-            type:       d.label as FindingType,
-            severity:   d.severity,
-            confidence: d.confidence,
-            zone:       d.zone,
-            timestamp:  d.timestamp,
-            notes:      `Detected during live inspection. Confidence: ${Math.round(d.confidence * 100)}%.`,
-            resolved:   false,
-            isLive:     true,
-          }))
-      : [];
+    const all: Finding[] = sourceDets.map((d) => ({
+      id:         d.id,
+      type:       d.label as FindingType,
+      severity:   d.severity,
+      confidence: d.confidence,
+      zone:       d.zone,
+      timestamp:  d.timestamp,
+      notes:      "",
+      resolved:   false,
+      isLive:     isCurrentMission,
+    }));
 
-    const all = [...live, ...historical];
     setFindings(all);
     setSelectedId(all[0]?.id ?? "");
   }, [selectedAircraftId, missionAircraftId, missionDetections]);

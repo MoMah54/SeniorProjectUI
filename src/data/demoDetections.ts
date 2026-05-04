@@ -4,17 +4,20 @@
 // Each aircraft has its own subset of findings from the actual model run.
 //
 // Images with two detections (same imageFile) demonstrate co-detection:
-//   - ac-001: IMG_20230512_131503 has two cracks detected
-//   - ac-002: IMG_20230511_104930 has two dents detected
+//   - ac-001: IMG_20230512_131503 has two cracks (EDA)
+//   - ac-002: IMG_20230511_104930 has two dents (ECB)
+//   - ac-003: frame_00540 has two cracks (HNG — hangar scene)
 //
 // imageFile = prediction image filename served from /public/predictions/
 //
 // ZONE NOTE — real inspection photos (IMG_2023xxx):
-//   Zone is set to "Unknown" because these images come from a publicly
-//   sourced dataset that does not include GPS/telemetry logs.  Without
-//   coordinate data we cannot determine which part of the aircraft each
-//   photo covers without guessing.  Zone mapping for the simulation
-//   aircraft (ac-006) IS accurate — derived from image_coordinates_labeled.csv.
+//   Zone is set to "Unknown" — publicly-sourced dataset has no GPS/telemetry.
+//   Without coordinate data we cannot determine which aircraft part each photo
+//   covers without guessing.
+//
+// ZONE NOTE — simulation aircraft (ac-003 SIM-002, ac-006 SIM-001):
+//   Zones are accurate — derived from image_coordinates_labeled.csv using the
+//   formula:  frame_NNNNN → aircraft_region column at that frame index.
 
 import type { LiveDetection } from "./fleetStore";
 
@@ -94,31 +97,67 @@ const ECB: LiveDetection[] = [
   },
 ];
 
-// ── A6-EWA  (ac-003) — Boeing 777-21H(LR) ────────────────────────────────────
-const EWA: LiveDetection[] = [
+// ── SIM-002  (ac-003) — Unreal Engine Hangar Scene ───────────────────────────
+//
+// Middle loop phase (z = 1.6 m): drone orbits aircraft at eye level inside
+// the Unreal Engine hangar.  Zone mapping from image_coordinates_labeled.csv:
+//
+//   frame_00420 → Middle loop → "Mid Fuselage — Nose Left"
+//   frame_00460 → Middle loop → "Mid Fuselage — Mid Left"
+//   frame_00540 → Middle loop → "Mid Fuselage — Rear Left"
+//   frame_00600 → Middle loop → "Mid Fuselage — Rear Right"
+//   frame_00670 → Middle loop → "Mid Fuselage — Mid Right"
+//   frame_00700 → Middle loop → "Mid Fuselage — Nose Right"
+//
+const HNG: LiveDetection[] = [
   {
-    id: "EWA-001", label: "Missing Rivet", severity: "High", confidence: 0.827,
-    zone: "Unknown",           timestamp: "09:11:22",
-    imageFile: "IMG_20230511_102003_jpg.rf.83de787f16a5e9049de826e592d1fd52.jpg",
-    bbox: [271.94, 357.78, 387.89, 473.83],
+    // frame_00420 → Middle fuselage - front/nose-side - left side
+    id: "HNG-001", label: "Dent",  severity: "High",   confidence: 0.810,
+    zone: "Mid Fuselage — Nose Left",  timestamp: "10:42:18",
+    imageFile: "frame_00420.jpg",
+    bbox: [660, 460, 830, 600],
   },
   {
-    id: "EWA-002", label: "Missing Rivet", severity: "High", confidence: 0.819,
-    zone: "Unknown",           timestamp: "09:11:48",
-    imageFile: "IMG_20230511_103157_jpg.rf.477b7ad065e1e86c1f8c4fb8fa1f451e.jpg",
-    bbox: [498.56, 314.24, 539.21, 354.59],
+    // frame_00460 → Middle fuselage - mid-body - left side
+    id: "HNG-002", label: "Crack", severity: "Medium",  confidence: 0.570,
+    zone: "Mid Fuselage — Mid Left",   timestamp: "10:44:55",
+    imageFile: "frame_00460.jpg",
+    bbox: [680, 350, 800, 440],
   },
   {
-    id: "EWA-003", label: "Missing Rivet", severity: "High", confidence: 0.794,
-    zone: "Unknown",           timestamp: "09:10:42",
-    imageFile: "IMG_20230511_100718_jpg.rf.37db056fb4a92fd4530292e2d49b12b6.jpg",
-    bbox: [189.80, 367.57, 335.64, 514.86],
+    // frame_00540 → Middle fuselage - rear-body/tail-side - left side (co-detection)
+    id: "HNG-003", label: "Crack", severity: "Medium",  confidence: 0.530,
+    zone: "Mid Fuselage — Rear Left",  timestamp: "10:29:12",
+    imageFile: "frame_00540.jpg",
+    bbox: [380, 330, 520, 420],
   },
   {
-    id: "EWA-004", label: "Dent",          severity: "High", confidence: 0.788,
-    zone: "Unknown",           timestamp: "09:12:02",
-    imageFile: "IMG_20230511_103726_jpg.rf.d8bce75a6cddae885ed1bcfd24ebff09.jpg",
-    bbox: [334.90, 173.44, 442.85, 294.27],
+    // Second crack in the same frame as HNG-003
+    id: "HNG-004", label: "Crack", severity: "Medium",  confidence: 0.500,
+    zone: "Mid Fuselage — Rear Left",  timestamp: "10:29:12",
+    imageFile: "frame_00540.jpg",
+    bbox: [680, 280, 830, 375],
+  },
+  {
+    // frame_00600 → Middle fuselage - rear-body/tail-side - right side
+    id: "HNG-005", label: "Crack", severity: "High",    confidence: 0.720,
+    zone: "Mid Fuselage — Rear Right", timestamp: "09:31:40",
+    imageFile: "frame_00600.jpg",
+    bbox: [70, 570, 200, 730],
+  },
+  {
+    // frame_00670 → Middle fuselage - mid-body - right side
+    id: "HNG-006", label: "Crack", severity: "Medium",  confidence: 0.530,
+    zone: "Mid Fuselage — Mid Right",  timestamp: "11:21:47",
+    imageFile: "frame_00670.jpg",
+    bbox: [370, 340, 520, 450],
+  },
+  {
+    // frame_00700 → Middle fuselage - front/nose-side - right side
+    id: "HNG-007", label: "Dent",  severity: "Medium",  confidence: 0.660,
+    zone: "Mid Fuselage — Nose Right", timestamp: "11:18:33",
+    imageFile: "frame_00700.jpg",
+    bbox: [630, 370, 820, 540],
   },
 ];
 
@@ -257,7 +296,7 @@ const SIM: LiveDetection[] = [
 export const AIRCRAFT_DETECTIONS: Record<string, LiveDetection[]> = {
   "ac-001": EDA,
   "ac-002": ECB,
-  "ac-003": EWA,
+  "ac-003": HNG,
   "ac-004": EEF,
   "ac-005": EBA,
   "ac-006": SIM,
