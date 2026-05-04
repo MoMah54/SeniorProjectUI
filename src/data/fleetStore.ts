@@ -106,17 +106,20 @@ export const FLEET: Aircraft[] = [
     manufactureYear: 2003,
   },
   {
+    // Unreal Engine hangar-scene simulation — drone orbits aircraft at eye-level
+    // (Middle loop phase, z = 1.6 m).  Zone mapping derived from
+    // image_coordinates_labeled.csv using frame index → aircraft_region.
     id: "ac-003",
-    registration: "A6-EWA",
-    model: "Boeing 777-21H(LR)",
-    shortModel: "777-200LR",
-    manufacturer: "Boeing",
-    airline: "Emirates",
-    status: "In Maintenance",
-    lastInspection: "2026-01-15",
-    nextInspection: "2026-04-15",
-    totalFlightHours: 44_790,
-    manufactureYear: 2007,
+    registration: "SIM-002",
+    model: "Simulation Research Aircraft (Hangar)",
+    shortModel: "SIM-H",
+    manufacturer: "AeroScan 3D Lab",
+    airline: "Research & Training",
+    status: "Active",
+    lastInspection: "2026-04-28",
+    nextInspection: "2026-07-28",
+    totalFlightHours: 0,
+    manufactureYear: 2023,
   },
   {
     id: "ac-004",
@@ -344,22 +347,31 @@ const BASE_HISTORY: FlightRecord[] = [
     ],
   },
 
-  // ── A6-EWA (ac-003) ────────────────────────────────────────────────────────
+  // ── SIM-002 (ac-003) — Unreal Engine Hangar Simulation ────────────────────
+  // Middle loop phase (z = 1.6 m): eye-level orbital pass around the aircraft.
+  // Zones derived from image_coordinates_labeled.csv.
   {
     id: "fl-0301",
     aircraftId: "ac-003",
-    date: "2025-08-20",
-    duration: "55 min",
-    pilotName: "Capt. Ahmed Al-Rashidi",
-    engineer: "Capt. Ahmed Al-Rashidi",
+    date: "2025-11-20",
+    duration: "18 min",
+    pilotName: "Auto-Scan System",
+    engineer: "Auto-Scan System",
     status: "Archived",
-    accessCode: "KX9E6H",
+    accessCode: "HSM3A1",
     findings: [
       {
         id: "fnd-0301-1", flightId: "fl-0301", aircraftId: "ac-003",
-        type: "Corrosion", severity: "Low", confidence: 0.77,
-        zone: "Engine cowling (1)", timestamp: "15:22:44",
-        notes: "Surface corrosion on engine nacelle. Treatment applied.",
+        type: "Dent", severity: "High", confidence: 0.810,
+        zone: "Mid Fuselage — Nose Left", timestamp: "10:42:18",
+        notes: "Dent detected on forward fuselage left side during hangar middle-loop pass. Used as baseline reference.",
+        resolved: true, reoccurrence: false,
+      },
+      {
+        id: "fnd-0301-2", flightId: "fl-0301", aircraftId: "ac-003",
+        type: "Crack", severity: "Medium", confidence: 0.570,
+        zone: "Mid Fuselage — Mid Left", timestamp: "10:44:55",
+        notes: "Crack candidate on mid-body left panel. Model classified with moderate confidence.",
         resolved: true, reoccurrence: false,
       },
     ],
@@ -367,26 +379,59 @@ const BASE_HISTORY: FlightRecord[] = [
   {
     id: "fl-0302",
     aircraftId: "ac-003",
-    date: "2026-01-15",
-    duration: "48 min",
-    pilotName: "Capt. Sarah Mitchell",
-    engineer: "Capt. Sarah Mitchell",
+    date: "2026-02-10",
+    duration: "22 min",
+    pilotName: "Auto-Scan System",
+    engineer: "Auto-Scan System",
     status: "Completed",
-    accessCode: "LY4F3J",
+    accessCode: "HSM3B2",
     findings: [
       {
         id: "fnd-0302-1", flightId: "fl-0302", aircraftId: "ac-003",
-        type: "Corrosion", severity: "Medium", confidence: 0.86,
-        zone: "Engine cowling (1)", timestamp: "10:48:12",
-        notes: "Corrosion returned to engine cowling. More aggressive treatment required.",
+        type: "Crack", severity: "High", confidence: 0.720,
+        zone: "Mid Fuselage — Rear Right", timestamp: "09:31:40",
+        notes: "High-confidence crack on rear-right fuselage. Recurring zone flagged for monitoring.",
         resolved: false, reoccurrence: true,
       },
       {
         id: "fnd-0302-2", flightId: "fl-0302", aircraftId: "ac-003",
-        type: "Crack", severity: "Low", confidence: 0.71,
-        zone: "Vertical stabilizer", timestamp: "11:15:30",
-        notes: "Micro-crack in surface coating. Non-structural, sealed.",
+        type: "Crack", severity: "Medium", confidence: 0.530,
+        zone: "Mid Fuselage — Rear Left", timestamp: "09:29:12",
+        notes: "Crack pattern on rear-left fuselage panel. Added to training dataset.",
         resolved: true, reoccurrence: false,
+      },
+    ],
+  },
+  {
+    id: "fl-0303",
+    aircraftId: "ac-003",
+    date: "2026-04-28",
+    duration: "25 min",
+    pilotName: "Auto-Scan System",
+    engineer: "Auto-Scan System",
+    status: "Pending Review",
+    accessCode: "HSM3C3",
+    findings: [
+      {
+        id: "fnd-0303-1", flightId: "fl-0303", aircraftId: "ac-003",
+        type: "Crack", severity: "High", confidence: 0.720,
+        zone: "Mid Fuselage — Rear Right", timestamp: "11:15:08",
+        notes: "Third detection of crack in rear-right zone. Pattern confirmed — added to recurrence tracker.",
+        resolved: false, reoccurrence: true,
+      },
+      {
+        id: "fnd-0303-2", flightId: "fl-0303", aircraftId: "ac-003",
+        type: "Dent", severity: "Medium", confidence: 0.660,
+        zone: "Mid Fuselage — Nose Right", timestamp: "11:18:33",
+        notes: "Dent on forward fuselage right side. Pending manual confirmation.",
+        resolved: false, reoccurrence: false,
+      },
+      {
+        id: "fnd-0303-3", flightId: "fl-0303", aircraftId: "ac-003",
+        type: "Crack", severity: "Medium", confidence: 0.530,
+        zone: "Mid Fuselage — Mid Right", timestamp: "11:21:47",
+        notes: "Crack on mid-body right panel. Below structural threshold — flagged for monitoring.",
+        resolved: false, reoccurrence: false,
       },
     ],
   },
@@ -644,6 +689,44 @@ export function getZoneRecurrences(aircraftId: string): ZoneRecurrence[] {
 
 export function getUnresolvedCount(aircraftId: string): number {
   return getAllFindings(aircraftId).filter((f) => !f.resolved).length;
+}
+
+// ── BASE_HISTORY-only helpers (no localStorage pollution) ─────────────────────
+// Use these in Flight History so repeated demo runs don't inflate counts.
+
+export function getBaseFlights(aircraftId: string): FlightRecord[] {
+  return BASE_HISTORY
+    .filter((f) => f.aircraftId === aircraftId)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+export function getBaseZoneRecurrences(aircraftId: string): ZoneRecurrence[] {
+  const flights = [...getBaseFlights(aircraftId)].reverse(); // oldest → newest
+  const map = new Map<string, ZoneRecurrence>();
+
+  for (const flight of flights) {
+    for (const finding of flight.findings) {
+      const key = `${finding.zone}::${finding.type}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.count++;
+        existing.lastSeverity = finding.severity;
+        existing.flightDates.push(flight.date);
+      } else {
+        map.set(key, {
+          zone:         finding.zone,
+          type:         finding.type,
+          count:        1,
+          lastSeverity: finding.severity,
+          flightDates:  [flight.date],
+        });
+      }
+    }
+  }
+
+  return Array.from(map.values())
+    .filter((r) => r.count > 1)
+    .sort((a, b) => b.count - a.count);
 }
 
 /** Generate a random 6-char uppercase alphanumeric access code. */
