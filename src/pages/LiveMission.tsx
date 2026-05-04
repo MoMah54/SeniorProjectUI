@@ -92,19 +92,6 @@ export default function LiveMission({ aircraft, pilotName: _pilotName = "Unknown
         });
     }
 
-    function returnToHome() {
-        if (telemetry.status === "Landed" || telemetry.status === "Returning") return;
-
-        homeRef.current = {
-            lat: +(telemetry.lat - 0.0012).toFixed(6),
-            lng: +(telemetry.lng + 0.0014).toFixed(6),
-        };
-
-        setPaused(false);
-        setTelemetry((curr) => ({ ...curr, status: "Returning" }));
-        pushEvent("Return-to-home initiated. Drone landing automatically.", "Warning");
-    }
-
     function handleAbortClick() {
         if (abortPending) {
             // Second click — confirmed
@@ -605,18 +592,6 @@ const btnSecondary: React.CSSProperties = {
     color: colors.textPrimary,
     cursor: "pointer",
     fontWeight: typography.weight.semibold,
-    fontFamily: typography.fontFamily,
-};
-
-const btnWarn: React.CSSProperties = {
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(247,201,72,0.32)",
-    background: "rgba(247,201,72,0.12)",
-    color: colors.textPrimary,
-    cursor: "pointer",
-    fontWeight: typography.weight.bold,
     fontFamily: typography.fontFamily,
 };
 
