@@ -3,7 +3,7 @@
 // New flight records created during live missions are persisted to localStorage.
 
 export type AircraftStatus = "Active" | "In Maintenance" | "Grounded";
-export type FindingType    = "Crack" | "Dent" | "Corrosion";
+export type FindingType    = "Crack" | "Dent" | "Corrosion" | "Scratch" | "Missing Rivet" | "Paint Damage";
 export type Severity       = "Low" | "Medium" | "High";
 export type FlightStatus   = "Completed" | "Pending Review" | "Archived";
 
@@ -30,6 +30,10 @@ export interface LiveDetection {
   confidence: number;
   zone: string;
   timestamp: string;
+  /** Filename of the YOLOv11 prediction image in public/predictions/ */
+  imageFile?: string;
+  /** Bounding box [x1, y1, x2, y2] in original image pixels */
+  bbox?: [number, number, number, number];
 }
 
 // ── Historical types ──────────────────────────────────────────────────────────
@@ -139,6 +143,21 @@ export const FLEET: Aircraft[] = [
     nextInspection: "2026-04-05",
     totalFlightHours: 67_102,
     manufactureYear: 2001,
+  },
+  {
+    // Synthetic 3D simulation model used as the ML training reference aircraft.
+    // Zones were computed from image_surface_coordinates.csv × regions.json.
+    id: "ac-006",
+    registration: "SIM-001",
+    model: "Simulation Research Aircraft",
+    shortModel: "SIM",
+    manufacturer: "AeroScan 3D Lab",
+    airline: "Research & Training",
+    status: "Active",
+    lastInspection: "2026-04-10",
+    nextInspection: "2026-07-10",
+    totalFlightHours: 0,           // ground-based simulation rig
+    manufactureYear: 2023,
   },
 ];
 
@@ -407,6 +426,93 @@ const BASE_HISTORY: FlightRecord[] = [
         type: "Corrosion", severity: "Medium", confidence: 0.86,
         zone: "Engine cowling (2)", timestamp: "09:33:05",
         notes: "Corrosion on engine 2 nacelle. Treated and logged.",
+        resolved: false, reoccurrence: false,
+      },
+    ],
+  },
+
+  // ── SIM-001 (ac-006) — Simulation Research Aircraft ───────────────────────
+  {
+    id: "fl-0601",
+    aircraftId: "ac-006",
+    date: "2025-11-08",
+    duration: "22 min",
+    pilotName: "Auto-Scan System",
+    engineer: "Auto-Scan System",
+    status: "Archived",
+    accessCode: "SIM6A1",
+    findings: [
+      {
+        id: "fnd-0601-1", flightId: "fl-0601", aircraftId: "ac-006",
+        type: "Crack", severity: "High", confidence: 0.92,
+        zone: "Fuselage", timestamp: "10:02:14",
+        notes: "Crack detected on fuselage skin panel during initial simulation pass. Used as baseline reference for ML model validation.",
+        resolved: true, reoccurrence: false,
+      },
+      {
+        id: "fnd-0601-2", flightId: "fl-0601", aircraftId: "ac-006",
+        type: "Crack", severity: "High", confidence: 0.91,
+        zone: "Fuselage", timestamp: "10:04:38",
+        notes: "Second fuselage crack identified near window row. Model correctly classified with high confidence.",
+        resolved: true, reoccurrence: false,
+      },
+    ],
+  },
+  {
+    id: "fl-0602",
+    aircraftId: "ac-006",
+    date: "2026-02-14",
+    duration: "28 min",
+    pilotName: "Auto-Scan System",
+    engineer: "Auto-Scan System",
+    status: "Completed",
+    accessCode: "SIM6B2",
+    findings: [
+      {
+        id: "fnd-0602-1", flightId: "fl-0602", aircraftId: "ac-006",
+        type: "Crack", severity: "High", confidence: 0.929,
+        zone: "Fuselage", timestamp: "09:18:55",
+        notes: "Reoccurrence of crack pattern in mid-fuselage region. 3D model texture updated post-detection.",
+        resolved: true, reoccurrence: true,
+      },
+      {
+        id: "fnd-0602-2", flightId: "fl-0602", aircraftId: "ac-006",
+        type: "Crack", severity: "Medium", confidence: 0.904,
+        zone: "Fuselage", timestamp: "09:22:11",
+        notes: "Additional crack detected aft of wing box. Added to training dataset for YOLOv11 fine-tuning.",
+        resolved: true, reoccurrence: false,
+      },
+    ],
+  },
+  {
+    id: "fl-0603",
+    aircraftId: "ac-006",
+    date: "2026-04-10",
+    duration: "31 min",
+    pilotName: "Auto-Scan System",
+    engineer: "Auto-Scan System",
+    status: "Pending Review",
+    accessCode: "SIM6C3",
+    findings: [
+      {
+        id: "fnd-0603-1", flightId: "fl-0603", aircraftId: "ac-006",
+        type: "Crack", severity: "High", confidence: 0.912,
+        zone: "Fuselage", timestamp: "11:05:42",
+        notes: "Forward fuselage crack near door surround. Third occurrence — pattern added to recurrence tracker.",
+        resolved: false, reoccurrence: true,
+      },
+      {
+        id: "fnd-0603-2", flightId: "fl-0603", aircraftId: "ac-006",
+        type: "Crack", severity: "High", confidence: 0.877,
+        zone: "Fuselage", timestamp: "11:08:19",
+        notes: "Longitudinal crack along panel seam. Pending manual inspection confirmation.",
+        resolved: false, reoccurrence: false,
+      },
+      {
+        id: "fnd-0603-3", flightId: "fl-0603", aircraftId: "ac-006",
+        type: "Crack", severity: "Medium", confidence: 0.859,
+        zone: "Fuselage", timestamp: "11:11:37",
+        notes: "Hairline crack at stringer junction. Below structural threshold but flagged for monitoring.",
         resolved: false, reoccurrence: false,
       },
     ],

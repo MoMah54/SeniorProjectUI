@@ -19,13 +19,12 @@ interface CheckItem {
 }
 
 const CHECKS: CheckItem[] = [
-  { label: "Drone battery level",   value: "100% — Full charge",       status: "ok" },
-  { label: "Camera system",         value: "4K sensor — Ready",        status: "ok" },
-  { label: "GPS & positioning",     value: "12 satellites locked",     status: "ok" },
-  { label: "Image storage",         value: "64 GB — Available",        status: "ok" },
-  { label: "Comms link",            value: "Encrypted — 28 dBm",       status: "ok" },
-  { label: "AI model (YOLOv8)",     value: "v2.4.1 — Loaded",          status: "ok" },
-  { label: "Aircraft documentation",value: "MSN retrieved",            status: "ok" },
+  { label: "Drone battery level", value: "100% — Full charge", status: "ok" },
+  { label: "Camera system", value: "Camera sensor — Ready", status: "ok" },
+  { label: "GPS & positioning", value: "12 satellites locked", status: "ok" },
+  { label: "SD card storage", value: "64 GB — Available", status: "ok" },
+  { label: "Comms link", value: "Encrypted — 28 dBm", status: "ok" },
+  { label: "Aircraft documentation", value: "MSN retrieved", status: "ok" },
 ];
 
 export default function MissionBriefing({ aircraft, onLaunch, onCancel }: Props) {
@@ -72,8 +71,8 @@ export default function MissionBriefing({ aircraft, onLaunch, onCancel }: Props)
           </div>
 
           <div style={{ marginTop: spacing.lg, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <InfoBox label="Status"  value={aircraft.status}    tone={aircraft.status === "Active" ? "ok" : "warn"} />
-            <InfoBox label="Model"   value={aircraft.shortModel} tone="neutral" />
+            <InfoBox label="Status" value={aircraft.status} tone={aircraft.status === "Active" ? "ok" : "warn"} />
+            <InfoBox label="Model" value={aircraft.shortModel} tone="neutral" />
             <InfoBox label="Flight Hours" value={aircraft.totalFlightHours.toLocaleString()} tone="neutral" />
             <InfoBox label="Mfg. Year" value={String(aircraft.manufactureYear)} tone="neutral" />
           </div>
@@ -84,9 +83,10 @@ export default function MissionBriefing({ aircraft, onLaunch, onCancel }: Props)
             </div>
             <div style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.6 }}>
               Drone orbits the aircraft fuselage at 4–6 m altitude, capturing
-              high-resolution images at 12 inspection waypoints. Images are processed
-              offline by the YOLOv8 model to detect cracks, dents, and corrosion.
-              Detection results are available in Detection View after landing.
+              high-resolution images at 12 inspection waypoints. After landing,
+              images are transferred and analysed offline by YOLOv11 to detect
+              cracks, dents, corrosion, and missing rivets. Results are available
+              in Detection View once processing is complete.
             </div>
           </div>
         </Card>
@@ -135,7 +135,7 @@ export default function MissionBriefing({ aircraft, onLaunch, onCancel }: Props)
                 fontWeight: 700,
               }}
             >
-              ✓ All systems nominal — aircraft ready for inspection
+              ✓ All systems nominal - aircraft ready for inspection
             </div>
           )}
 

@@ -42,8 +42,12 @@ export default function DetectionView({ aircraft, detections }: Props) {
     );
   }
 
-  const selected = detections[selectedIdx];
-  const detId    = `D-${String(selectedIdx + 1).padStart(3, "0")}`;
+  const selected     = detections[selectedIdx];
+  const detId        = selected.id;
+  // Other detections captured in the same photo
+  const coDetections = selected.imageFile
+    ? detections.filter((d) => d.imageFile === selected.imageFile && d.id !== selected.id)
+    : [];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
@@ -71,7 +75,7 @@ export default function DetectionView({ aircraft, detections }: Props) {
           <div style={listHeader}>DETECTIONS</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {detections.map((d, i) => {
-              const id     = `D-${String(i + 1).padStart(3, "0")}`;
+              const id     = d.id;
               const active = i === selectedIdx;
               const sev    = sevColors(d.severity);
               return (
@@ -115,7 +119,7 @@ export default function DetectionView({ aircraft, detections }: Props) {
               </span>
             </div>
 
-            <CameraCanvas detection={selected} detIdx={selectedIdx} />
+            <CameraFrame detection={selected} detIdx={selectedIdx} />
 
             <div style={navRow}>
               <button
@@ -151,6 +155,37 @@ export default function DetectionView({ aircraft, detections }: Props) {
               <MetaBox label="Zone"         value={selected.zone} />
               <MetaBox label="Timestamp"    value={selected.timestamp} mono />
             </div>
+
+            {/* Co-detections: other findings captured in the same frame */}
+            {coDetections.length > 0 && (
+              <div style={{ marginTop: spacing.md }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.38)", letterSpacing: "0.8px", marginBottom: 8 }}>
+                  ALSO DETECTED IN THIS FRAME
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {coDetections.map((co) => {
+                    const sev = sevColors(co.severity);
+                    return (
+                      <div key={co.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 8, background: sev.bg, border: `1px solid ${sev.border}` }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ fontFamily: typography.monoFamily, fontSize: 12, fontWeight: 700, color: sev.text }}>{co.id}</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: colors.textPrimary }}>{co.label}</span>
+                          <span style={{ fontSize: 12, color: colors.textSecondary }}>{co.zone}</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 12, fontFamily: typography.monoFamily, color: colors.textSecondary }}>{Math.round(co.confidence * 100)}%</span>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 999, border: `1px solid ${sev.border}`, background: "rgba(0,0,0,0.25)", fontSize: 11, fontWeight: 600, color: sev.text }}>
+                            <span style={{ width: 5, height: 5, borderRadius: "50%", background: sev.dot, display: "inline-block" }} />
+                            {co.severity}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div style={linkNote}>
               Detection {detId} is traceable in Results Review and Flight History.
             </div>
@@ -163,7 +198,66 @@ export default function DetectionView({ aircraft, detections }: Props) {
   );
 }
 
-// ── Camera canvas ─────────────────────────────────────────────────────────────
+// ── Camera frame — real image if available, animated canvas otherwise ─────────
+
+function CameraFrame({ detection, detIdx }: { detection: LiveDetection; detIdx: number }) {
+  const [imgError, setImgError] = React.useState(false);
+
+  // Reset error state when detection changes
+  React.useEffect(() => { setImgError(false); }, [detection.imageFile]);
+
+  // Show the real prediction image when available and not broken
+  if (detection.imageFile && !imgError) {
+    const sev = detection.severity;
+    const sevColor = sev === "High" ? "#ff5c73" : sev === "Medium" ? "#f7c948" : "#3ddc97";
+    const detId = detection.id;
+    return (
+      <div style={{ position: "relative", width: "100%", lineHeight: 0, maxHeight: 400, overflow: "hidden", background: "#0c1422", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <img
+          src={`/predictions/${detection.imageFile}`}
+          alt={`YOLOv11 detection ${detId}`}
+          onError={() => setImgError(true)}
+          style={{ width: "100%", maxHeight: 400, objectFit: "contain", display: "block" }}
+        />
+        {/* HUD overlay — detection ID + confidence badge */}
+        <div style={{
+          position: "absolute", top: 10, left: 10,
+          background: `${sevColor}dd`,
+          color: "#000", fontFamily: "monospace",
+          fontSize: 11, fontWeight: 700,
+          padding: "3px 9px", borderRadius: 4, letterSpacing: "0.4px",
+          pointerEvents: "none",
+        }}>
+          {detId} &nbsp;·&nbsp; {detection.label.toUpperCase()} &nbsp;·&nbsp; {Math.round(detection.confidence * 100)}%
+        </div>
+        {/* Severity label top-right */}
+        <div style={{
+          position: "absolute", top: 10, right: 10,
+          background: "rgba(0,0,0,0.72)",
+          color: sevColor, fontFamily: "monospace",
+          fontSize: 10, fontWeight: 700,
+          padding: "3px 8px", borderRadius: 4, letterSpacing: "0.8px",
+          pointerEvents: "none",
+        }}>
+          {sev.toUpperCase()}
+        </div>
+        {/* Zone label bottom-left */}
+        <div style={{
+          position: "absolute", bottom: 10, left: 10,
+          color: "rgba(255,255,255,0.55)", fontFamily: "monospace",
+          fontSize: 9, letterSpacing: "0.5px",
+          background: "rgba(0,0,0,0.55)", padding: "2px 7px", borderRadius: 3,
+          pointerEvents: "none",
+        }}>
+          ZONE: {detection.zone.toUpperCase()}
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback: animated canvas simulation (no imageFile, or image failed to load)
+  return <CameraCanvas detection={detection} detIdx={detIdx} />;
+}
 
 function CameraCanvas({ detection, detIdx }: { detection: LiveDetection; detIdx: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -179,7 +273,7 @@ function CameraCanvas({ detection, detIdx }: { detection: LiveDetection; detIdx:
     const sev             = detection.severity;
     const [r, g, b]       = sev === "High" ? [255, 92, 115] : sev === "Medium" ? [247, 201, 72] : [61, 220, 151];
     const box             = getBoxForZone(detection.zone, W, H);
-    const detId           = `D-${String(detIdx + 1).padStart(3, "0")}`;
+    const detId           = detection.id;
     let t                 = 0;
 
     function draw() {
@@ -258,7 +352,6 @@ function CameraCanvas({ detection, detIdx }: { detection: LiveDetection; detIdx:
       ctx.fillText(tag, bx + 7, tagY + 12);
 
       // ── HUD overlays ────────────────────────────────────────────────────
-      // Corner brackets (frame edges)
       const hm = 8, hl = 14;
       ctx.strokeStyle = "rgba(56,189,248,0.30)";
       ctx.lineWidth = 1.5;
@@ -267,13 +360,11 @@ function CameraCanvas({ detection, detIdx }: { detection: LiveDetection; detIdx:
       ctx.beginPath(); ctx.moveTo(hm, H - hm - hl); ctx.lineTo(hm, H - hm); ctx.lineTo(hm + hl, H - hm); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(W - hm - hl, H - hm); ctx.lineTo(W - hm, H - hm); ctx.lineTo(W - hm, H - hm - hl); ctx.stroke();
 
-      // Bottom-left: zone label
       ctx.font      = "9px monospace";
       ctx.fillStyle = "rgba(255,255,255,0.36)";
       ctx.textAlign = "left";
       ctx.fillText(`ZONE: ${detection.zone.toUpperCase()}`, 10, H - 8);
 
-      // Top-right: severity
       ctx.font      = "bold 10px monospace";
       ctx.textAlign = "right";
       ctx.fillStyle = `rgba(${r},${g},${b},0.90)`;

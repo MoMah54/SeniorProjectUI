@@ -15,6 +15,9 @@ interface Props {
   pilotName: string;
   onViewHistory: () => void;
   onNewMission: () => void;
+  /** If provided, updates the record already saved on drone launch instead of creating a new one */
+  existingFlightId?: string;
+  existingAccessCode?: string;
 }
 
 export default function MissionReport({
@@ -24,14 +27,17 @@ export default function MissionReport({
   pilotName,
   onViewHistory,
   onNewMission,
+  existingFlightId,
+  existingAccessCode,
 }: Props) {
-  const accessCode  = useRef(generateAccessCode());
+  // Reuse the access code generated on launch so the analyst's copy stays valid
+  const accessCode = useRef(existingAccessCode ?? generateAccessCode());
   const [copied, setCopied] = useState(false);
 
-  // Save to localStorage exactly once on mount
+  // Update (or create) the flight record once on mount with the final duration
   useEffect(() => {
-    const today     = new Date().toISOString().slice(0, 10);
-    const flightId  = `fl-live-${Date.now().toString(36).toUpperCase()}`;
+    const today    = new Date().toISOString().slice(0, 10);
+    const flightId = existingFlightId ?? `fl-live-${Date.now().toString(36).toUpperCase()}`;
 
     const findings: HistoricalFinding[] = detections.map((d, i) => ({
       id: d.id || `fnd-${flightId}-${i}`,
@@ -59,6 +65,7 @@ export default function MissionReport({
       accessCode: accessCode.current,
     };
 
+    // saveFlightRecord filters by id — same id = update, new id = insert
     saveFlightRecord(record);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

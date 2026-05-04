@@ -1,9 +1,10 @@
 // src/pages/LiveMission.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import DroneSimulationView from "../components/DroneSimulationView";
 import Card from "../ui/Card";
 import { colors, radius, spacing, typography } from "../ui/tokens";
 import type { Aircraft, LiveDetection } from "../data/fleetStore";
+// LiveDetection only used in the onMissionComplete callback signature
 
 type Telemetry = {
     battery: number;
@@ -15,8 +16,6 @@ type Telemetry = {
     status: "Scanning" | "Holding" | "Returning" | "Landed";
 };
 
-// Use the shared LiveDetection type from fleetStore
-type Detection = LiveDetection;
 
 type MissionEvent = {
     id: string;
@@ -58,11 +57,11 @@ export default function LiveMission({ aircraft, pilotName: _pilotName = "Unknown
     const [missionTime, setMissionTime] = useState<number>(0);
     const [paused, setPaused] = useState<boolean>(false);
 
-    // Start empty — detections are discovered progressively as the drone scans
-    const [detections, setDetections] = useState<Detection[]>([]);
+    // Image capture counter — increments each time the drone stops at a waypoint
+    const [imagesCaptured, setImagesCaptured] = useState<number>(0);
 
     const [events, setEvents] = useState<MissionEvent[]>([
-        { id: "E-1", time: nowTime(), message: "Mission started.", severity: "Info" },
+        { id: "E-1", time: nowTime(), message: "Mission started. Drone capturing images.", severity: "Info" },
         { id: "E-2", time: nowTime(), message: "Telemetry link stable.", severity: "Info" },
     ]);
 
@@ -76,28 +75,6 @@ export default function LiveMission({ aircraft, pilotName: _pilotName = "Unknown
             severity,
         };
         setEvents((prev) => [event, ...prev].slice(0, 8));
-    }
-
-    function pushDetection() {
-        const samples: Omit<Detection, "id" | "timestamp">[] = [
-            { label: "Crack", severity: "High", confidence: 0.91, zone: "Forward fuselage" },
-            { label: "Dent", severity: "Medium", confidence: 0.83, zone: "Engine cowling" },
-            { label: "Corrosion", severity: "Low", confidence: 0.74, zone: "Aft fuselage" },
-        ];
-
-        const picked = samples[Math.floor(Math.random() * samples.length)];
-
-        const next: Detection = {
-            id: `D-${Math.floor(100 + Math.random() * 900)}`,
-            timestamp: nowTime(),
-            ...picked,
-        };
-
-        setDetections((prev) => [next, ...prev].slice(0, 6));
-        pushEvent(
-            `${next.label} detected at ${next.zone} (${Math.round(next.confidence * 100)}% confidence).`,
-            next.severity === "High" ? "Warning" : "Info"
-        );
     }
 
     function togglePause() {
@@ -176,14 +153,12 @@ export default function LiveMission({ aircraft, pilotName: _pilotName = "Unknown
                         pushEvent("Drone landed at home position.", "Info");
                         homeRef.current = null;
                         // Fire mission-complete callback (once only)
+                        // Detections come from the pre-loaded mission state in App,
+                        // not from live flight — drone only captures images.
                         if (!missionCompleteRef.current && onMissionComplete) {
                             missionCompleteRef.current = true;
-                            // Small delay so "Landed" renders first
                             window.setTimeout(() => {
-                                setDetections((d) => {
-                                    onMissionComplete(d, missionTime);
-                                    return d;
-                                });
+                                onMissionComplete([], missionTime);
                             }, 1800);
                         }
                         return {
@@ -227,23 +202,18 @@ export default function LiveMission({ aircraft, pilotName: _pilotName = "Unknown
         return () => window.clearInterval(id);
     }, [paused]);
 
+    // Increment images-captured counter when drone is actively scanning
     useEffect(() => {
-        const detectionTimer = window.setInterval(() => {
-            if (!paused && telemetry.status === "Scanning" && Math.random() < 0.35) {
-                pushDetection();
+        const captureTimer = window.setInterval(() => {
+            if (!paused && telemetry.status === "Scanning") {
+                setImagesCaptured((prev) => prev + 1);
+                pushEvent("Image captured at waypoint.", "Info");
             }
-        }, 6000);
+        }, 8000);
 
-        return () => window.clearInterval(detectionTimer);
+        return () => window.clearInterval(captureTimer);
     }, [paused, telemetry.status]);
 
-    const missionSummary = useMemo(() => {
-        const high = detections.filter((d) => d.severity === "High").length;
-        return {
-            total: detections.length,
-            high,
-        };
-    }, [detections]);
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
@@ -254,14 +224,14 @@ export default function LiveMission({ aircraft, pilotName: _pilotName = "Unknown
                         <span style={aircraftBadge}>{aircraft.registration}</span>
                     </div>
                     <div style={{ color: colors.textSecondary, fontSize: 14 }}>
-                        Real-time drone tracking, telemetry, and defect monitoring for {aircraft.model}
+                        Real-time drone flight tracking and telemetry for {aircraft.model}
                     </div>
                 </div>
 
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
                     <StatusPill label={`Status: ${telemetry.status}`} tone={statusTone(telemetry.status)} />
                     <StatusPill label={`Mission Time: ${formatDuration(missionTime)}`} tone="neutral" />
-                    <StatusPill label={`Detections: ${missionSummary.total}`} tone="info" />
+                    <StatusPill label={`Images: ${imagesCaptured}`} tone="info" />
                 </div>
             </div>
 
@@ -274,7 +244,6 @@ export default function LiveMission({ aircraft, pilotName: _pilotName = "Unknown
 
                     <DroneSimulationView
                         telemetry={telemetry}
-                        detections={detections}
                         paused={paused}
                     />
 
@@ -338,15 +307,39 @@ export default function LiveMission({ aircraft, pilotName: _pilotName = "Unknown
                     </Card>
 
                     <Card>
-                        <div style={sectionTitle}>Live Findings</div>
-                        <div style={sectionSub}>Anomalies detected during this inspection session</div>
+                        <div style={sectionTitle}>Images Captured</div>
+                        <div style={sectionSub}>High-resolution photos collected at inspection waypoints</div>
 
                         <div style={{ height: spacing.md }} />
 
-                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                            {detections.map((d) => (
-                                <DetectionRow key={d.id} d={d} />
-                            ))}
+                        <div style={{
+                            display: "flex", alignItems: "center", gap: 16,
+                            padding: "14px 16px", borderRadius: 10,
+                            background: "rgba(56,189,248,0.07)",
+                            border: "1px solid rgba(56,189,248,0.18)",
+                        }}>
+                            <div style={{ fontSize: 32, fontWeight: 800, color: "rgba(56,189,248,0.9)", fontFamily: "monospace" }}>
+                                {String(imagesCaptured).padStart(3, "0")}
+                            </div>
+                            <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
+                                images captured so far<br />
+                                <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>
+                                    Stored on-board — transferred after landing
+                                </span>
+                            </div>
+                        </div>
+
+                        <div style={{ height: spacing.md }} />
+
+                        <div style={{
+                            padding: "12px 14px", borderRadius: 10,
+                            background: "rgba(247,201,72,0.07)",
+                            border: "1px solid rgba(247,201,72,0.20)",
+                            fontSize: 12, color: "rgba(247,201,72,0.80)", lineHeight: 1.6,
+                        }}>
+                            <span style={{ fontWeight: 700 }}>Note:</span> Defect detection is performed
+                            offline after landing. Images are transferred from the drone and processed
+                            through YOLOv11. Results will appear in Detection View once analysis is complete.
                         </div>
                     </Card>
 
@@ -392,31 +385,6 @@ function MiniStat({ label, value, mono }: { label: string; value: string; mono?:
                 }}
             >
                 {value}
-            </div>
-        </div>
-    );
-}
-
-function DetectionRow({ d }: { d: Detection }) {
-    const sev = severityStyle(d.severity);
-
-    return (
-        <div style={rowCard}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ fontWeight: 900, color: colors.textPrimary }}>{d.label}</span>
-                    <span style={{ ...pillBase, background: sev.bg, borderColor: sev.border }}>
-                        <span style={{ ...dotBase, background: sev.dot }} />
-                        {d.severity}
-                    </span>
-                </div>
-                <span style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.monoFamily }}>
-                    {d.id}
-                </span>
-            </div>
-
-            <div style={{ marginTop: 8, color: colors.textSecondary, fontSize: 13 }}>
-                {d.zone} • {Math.round(d.confidence * 100)}% confidence • {d.timestamp}
             </div>
         </div>
     );
@@ -489,12 +457,6 @@ function eventTone(severity: MissionEvent["severity"]) {
     if (severity === "Critical") return { bg: "rgba(255,92,115,0.12)", border: "rgba(255,92,115,0.28)", dot: colors.danger };
     if (severity === "Warning") return { bg: "rgba(247,201,72,0.12)", border: "rgba(247,201,72,0.28)", dot: colors.warning };
     return { bg: "rgba(59,130,246,0.12)", border: "rgba(59,130,246,0.28)", dot: colors.primary };
-}
-
-function severityStyle(sev: Detection["severity"]) {
-    if (sev === "High") return { bg: "rgba(255,92,115,0.12)", border: "rgba(255,92,115,0.28)", dot: colors.danger };
-    if (sev === "Medium") return { bg: "rgba(247,201,72,0.12)", border: "rgba(247,201,72,0.28)", dot: colors.warning };
-    return { bg: "rgba(61,220,151,0.12)", border: "rgba(61,220,151,0.28)", dot: colors.success };
 }
 
 function moveToward(current: number, target: number, factor: number) {

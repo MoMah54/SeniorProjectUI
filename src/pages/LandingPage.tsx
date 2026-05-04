@@ -94,9 +94,7 @@ export default function LandingPage({ onSignIn }: Props) {
           <div style={heroStats} className="hero-stats">
             <HeroStat value="&lt; 1hr" label="Inspection Time" />
             <div style={statDivider} className="stat-divider" />
-            <HeroStat value="95%+" label="Detection Accuracy" />
-            <div style={statDivider} className="stat-divider" />
-            <HeroStat value="60%↓" label="Operational Cost" />
+            <HeroStat value="85–87%" label="Detection Accuracy" />
             <div style={statDivider} className="stat-divider" />
             <HeroStat value="∞" label="Aircraft Supported" />
           </div>
@@ -181,7 +179,7 @@ export default function LandingPage({ onSignIn }: Props) {
               desc="The autonomous drone launches and follows a pre-programmed flight path around the aircraft, capturing high-resolution imagery at 12 inspection waypoints." />
             <div style={stepArrow} className="step-arrow">→</div>
             <Step num="02" title="AI Detects Anomalies"
-              desc="Captured images are processed by the YOLOv8 model. Cracks, dents, and corrosion are classified with bounding boxes, confidence scores, and zone labels." />
+              desc="Captured images are processed by the YOLOv11 model. Cracks, dents, and corrosion are classified with bounding boxes, confidence scores, and zone labels." />
             <div style={stepArrow} className="step-arrow">→</div>
             <Step num="03" title="Review & Export Report"
               desc="The maintenance engineer reviews flagged findings in the Ground Station Console, adds notes, validates each finding, and exports a complete inspection report." />
@@ -201,9 +199,9 @@ export default function LandingPage({ onSignIn }: Props) {
           </p>
           <div className="tech-grid" style={techGrid}>
             <TechCard category="AI & Vision" accent={colors.primary}
-              items={["YOLOv8 Object Detection", "Custom-trained defect model", "Real-time frame analysis", "Bounding box annotation"]} />
+              items={["YOLOv11 Object Detection", "Custom-trained defect model", "Real-time frame analysis", "Bounding box annotation"]} />
             <TechCard category="Drone Hardware" accent={colors.success}
-              items={["Custom-built drone platform", "Raspberry Pi 5 onboard", "High-resolution cameras", "Geofencing & standoff control"]} />
+              items={["Custom-built drone platform", "High-resolution cameras", "Geofencing & standoff control", "Autonomous flight path"]} />
             <TechCard category="Ground Station" accent={colors.warning}
               items={["React 19 + TypeScript", "Real-time telemetry stream", "WebSocket data pipeline", "JSON / CSV report export"]} />
             <TechCard category="Safety & Compliance" accent={colors.danger}

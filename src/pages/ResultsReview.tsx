@@ -10,7 +10,7 @@ import type { Aircraft, LiveDetection } from "../data/fleetStore";
 
 // ── Local types ───────────────────────────────────────────────────────────────
 
-type FindingType = "Crack" | "Dent" | "Corrosion";
+type FindingType = "Crack" | "Dent" | "Corrosion" | "Scratch" | "Missing Rivet" | "Paint Damage";
 type Severity    = "Low" | "Medium" | "High";
 
 interface Finding {

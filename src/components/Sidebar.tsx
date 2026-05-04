@@ -14,17 +14,17 @@ interface NavItem {
 }
 
 const ALL_NAV: NavItem[] = [
-  { page: "fleet",     label: "Fleet Overview",   icon: "✈",  description: "All aircraft" },
-  { page: "live",      label: "Live Tracker",      icon: "◉",  description: "Real-time drone" },
-  { page: "detection", label: "Detection View",    icon: "⊡",  description: "Frame inspection" },
-  { page: "review",    label: "Results Review",    icon: "≡",  description: "Findings & export" },
-  { page: "history",   label: "Flight History",    icon: "⏱",  description: "Inspection database" },
+  { page: "fleet", label: "Fleet Overview", icon: "✈", description: "All aircraft" },
+  { page: "live", label: "Live Tracker", icon: "◉", description: "Flight & telemetry" },
+  { page: "detection", label: "Detection View", icon: "⊡", description: "Frame inspection" },
+  { page: "review", label: "Results Review", icon: "≡", description: "Findings & export" },
+  { page: "history", label: "Flight History", icon: "⏱", description: "Inspection database" },
 ];
 
 // Pages each role can navigate to directly via the sidebar
 const ROLE_PAGES: Record<User["role"], AppPage[]> = {
-  "Pilot":         ["fleet", "live"],
-  "Analyst":       ["fleet", "detection", "review", "history"],
+  "Pilot": ["fleet", "live"],
+  "Analyst": ["fleet", "detection", "review", "history"],
   "Fleet Manager": ["fleet", "live", "detection", "review", "history"],
 };
 
@@ -41,17 +41,17 @@ interface Props {
 }
 
 const ROLE_COLOR: Record<User["role"], string> = {
-  "Pilot":         colors.success,
-  "Analyst":       "rgba(147,197,253,1)",
+  "Pilot": colors.success,
+  "Analyst": "rgba(147,197,253,1)",
   "Fleet Manager": colors.warning,
 };
 
 /** Returns true when this nav item should be inaccessible given current mission phase */
-function isLocked(page: AppPage, phase: "idle" | "briefing" | "live" | "complete", role: User["role"]): boolean {
+function isLocked(page: AppPage, phase: "idle" | "briefing" | "live" | "complete", _role: User["role"]): boolean {
   // Live Tracker: only unlocked once the drone has actually been launched
-  if (page === "live")      return phase !== "live";
-  // Detection View: Analysts always have access; others need an active mission
-  if (page === "detection") return role === "Analyst" ? false : phase === "idle";
+  if (page === "live") return phase !== "live";
+  // Detection View: always accessible — shows per-aircraft pre-loaded findings
+  if (page === "detection") return false;
   return false;
 }
 
@@ -59,9 +59,9 @@ export default function Sidebar({
   current, onNavigate, selectedAircraft, onGoFleet, onGoLanding, user, onLogout, missionPhase,
 }: Props) {
   const statusColor = {
-    Active:           colors.success,
+    Active: colors.success,
     "In Maintenance": colors.warning,
-    Grounded:         colors.danger,
+    Grounded: colors.danger,
   }[selectedAircraft.status];
 
   const allowedPages = ROLE_PAGES[user.role];
@@ -104,8 +104,8 @@ export default function Sidebar({
       <div style={{ padding: "14px 12px 8px", flex: 1, overflowY: "auto" }}>
         <div style={navLabel}>NAVIGATION</div>
         {navItems.map((item) => {
-          const active  = current === item.page;
-          const locked  = isLocked(item.page, missionPhase, user.role);
+          const active = current === item.page;
+          const locked = isLocked(item.page, missionPhase, user.role);
           return (
             <NavBtn
               key={item.page}
@@ -145,7 +145,7 @@ export default function Sidebar({
       <div style={footerSection}>
         <button type="button" onClick={onLogout} style={logoutBtn}>
           <span>Sign Out</span>
-          <span>↩</span>
+          <span></span>
         </button>
         <button type="button" onClick={onGoLanding} style={aboutBtn}>
           <span>AeroScan Pro · About</span>
@@ -160,9 +160,9 @@ function NavBtn({ item, active, locked, onNavigate }: {
   item: NavItem; active: boolean; locked: boolean; onNavigate: (p: AppPage) => void;
 }) {
   const lockHint =
-    item.page === "live"      ? "Launch the drone from Mission Briefing first" :
-    item.page === "detection" ? "Start an inspection first" :
-    "";
+    item.page === "live" ? "Launch the drone from Mission Briefing first" :
+      item.page === "detection" ? "Start an inspection first" :
+        "";
 
   return (
     <button

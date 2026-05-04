@@ -1,23 +1,23 @@
 // src/App.tsx
 import React, { useState } from "react";
-import LandingPage     from "./pages/LandingPage";
-import Login           from "./pages/Login";
-import Register        from "./pages/Register";
+import LandingPage from "./pages/LandingPage";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 import MissionBriefing from "./pages/MissionBriefing";
-import MissionReport   from "./pages/MissionReport";
-import Sidebar         from "./components/Sidebar";
+import MissionReport from "./pages/MissionReport";
+import Sidebar from "./components/Sidebar";
 import type { AppPage } from "./components/Sidebar";
-import LiveMission     from "./pages/LiveMission";
-import DetectionView   from "./pages/DetectionView";
-import ResultsReview   from "./pages/ResultsReview";
-import FleetView       from "./pages/FleetView";
-import FlightHistory   from "./pages/FlightHistory";
+import LiveMission from "./pages/LiveMission";
+import DetectionView from "./pages/DetectionView";
+import ResultsReview from "./pages/ResultsReview";
+import FleetView from "./pages/FleetView";
+import FlightHistory from "./pages/FlightHistory";
 import { colors, radius, spacing, typography } from "./ui/tokens";
-import { FLEET }       from "./data/fleetStore";
-import type { LiveDetection } from "./data/fleetStore";
+import { FLEET, saveFlightRecord, generateAccessCode } from "./data/fleetStore";
+import type { LiveDetection, HistoricalFinding, FlightRecord } from "./data/fleetStore";
 import { getCurrentUser, logoutUser } from "./data/authStore";
 import type { User } from "./data/authStore";
-import { DEMO_DETECTIONS } from "./data/demoDetections";
+import { getDetectionsForAircraft } from "./data/demoDetections";
 
 type AppState = "landing" | "login" | "register" | "app";
 
@@ -29,10 +29,13 @@ interface MissionSession {
   phase: "briefing" | "live" | "complete";
   detections: LiveDetection[];
   reportData?: { detections: LiveDetection[]; seconds: number };
+  // Set when drone launches so the same record is updated (not duplicated) on completion
+  liveFlightId?: string;
+  liveAccessCode?: string;
 }
 
 function defaultPage(role: User["role"]): AppPage {
-  if (role === "Analyst")       return "history";
+  if (role === "Analyst") return "history";
   if (role === "Fleet Manager") return "fleet";
   return "fleet";
 }
@@ -54,7 +57,7 @@ export default function App() {
   const selectedAircraft = FLEET.find((a) => a.id === selectedAircraftId) ?? FLEET[0];
 
   // Derived phase for the currently selected aircraft
-  const currentMission  = missions[selectedAircraftId];
+  const currentMission = missions[selectedAircraftId];
   const missionPhase: MissionPhase = currentMission?.phase ?? "idle";
 
   // ── Pre-auth screens ──────────────────────────────────────────────────────
@@ -94,16 +97,55 @@ export default function App() {
     setSelectedAircraftId(aircraftId);
     setMissions((prev) => ({
       ...prev,
-      [aircraftId]: { phase: "briefing", detections: DEMO_DETECTIONS },
+      [aircraftId]: { phase: "briefing", detections: getDetectionsForAircraft(aircraftId) },
     }));
     setPage("briefing");
   }
 
   /** Briefing → "Launch Mission" button */
   function handleLaunchDrone() {
+    const flightId = `fl-live-${Date.now().toString(36).toUpperCase()}`;
+    const accessCode = generateAccessCode();
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Build findings from the aircraft-specific detections already loaded
+    const findings: HistoricalFinding[] = getDetectionsForAircraft(selectedAircraftId).map((d, i) => ({
+      id: d.id ?? `fnd-${flightId}-${i}`,
+      flightId,
+      aircraftId: selectedAircraftId,
+      type: d.label,
+      severity: d.severity,
+      confidence: d.confidence,
+      zone: d.zone,
+      timestamp: d.timestamp,
+      notes: `Detected during live inspection. Confidence: ${Math.round(d.confidence * 100)}%.`,
+      resolved: false,
+      reoccurrence: false,
+    }));
+
+    const record: FlightRecord = {
+      id: flightId,
+      aircraftId: selectedAircraftId,
+      date: today,
+      duration: "In Progress",
+      pilotName: user!.name,
+      engineer: user!.name,
+      status: "Pending Review",
+      findings,
+      accessCode,
+    };
+
+    // Save immediately so analysts see it in Flight History right away
+    saveFlightRecord(record);
+
     setMissions((prev) => ({
       ...prev,
-      [selectedAircraftId]: { ...prev[selectedAircraftId]!, phase: "live" },
+      [selectedAircraftId]: {
+        ...prev[selectedAircraftId]!,
+        phase: "live",
+        liveFlightId: flightId,
+        liveAccessCode: accessCode,
+      },
     }));
     setPage("live");
   }
@@ -114,12 +156,16 @@ export default function App() {
     setPage("fleet");
   }
 
-  /** LiveMission fires this when the drone lands normally (Return Home) */
-  function handleMissionComplete(aircraftId: string, detections: LiveDetection[], seconds: number) {
-    const reportData = { detections, seconds };
+  /** LiveMission fires this when the drone lands normally (Return Home).
+   *  The drone only captures images — YOLOv11 runs offline after landing.
+   *  We use the pre-loaded detections from the mission state (set at briefing)
+   *  rather than anything generated during the live flight. */
+  function handleMissionComplete(aircraftId: string, _liveDets: LiveDetection[], seconds: number) {
+    const realDetections = missions[aircraftId]?.detections ?? getDetectionsForAircraft(aircraftId);
+    const reportData = { detections: realDetections, seconds };
     setMissions((prev) => ({
       ...prev,
-      [aircraftId]: { phase: "complete", detections, reportData },
+      [aircraftId]: { ...prev[aircraftId]!, phase: "complete", detections: realDetections, reportData },
     }));
     setSelectedAircraftId(aircraftId);
     setPage("report");
@@ -143,11 +189,10 @@ export default function App() {
     .filter(([, m]) => m.phase === "live")
     .map(([id]) => id);
 
-  // Which aircraft to actually render in the live view
-  const liveViewId      = liveMissionIds.includes(selectedAircraftId)
+  // Which aircraft tab is currently visible in the live view
+  const liveViewId = liveMissionIds.includes(selectedAircraftId)
     ? selectedAircraftId
     : (liveMissionIds[0] ?? selectedAircraftId);
-  const liveViewAircraft = FLEET.find((a) => a.id === liveViewId) ?? selectedAircraft;
 
   // ── Main shell ────────────────────────────────────────────────────────────
   return (
@@ -183,9 +228,13 @@ export default function App() {
           />
         )}
 
-        {/* ── Live Tracker — only rendered when at least one mission is live ── */}
-        {page === "live" && liveMissionIds.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: spacing.lg }}>
+        {/* ── Live Tracker ─────────────────────────────────────────────────────────
+             IMPORTANT: this block is always mounted while missions are live,
+             and only hidden via CSS when the user navigates away.
+             Unmounting would destroy all React state (battery, timers, drone
+             phase) — keeping it mounted preserves progress across page changes. */}
+        {liveMissionIds.length > 0 && (
+          <div style={{ display: page === "live" ? "flex" : "none", flexDirection: "column", gap: spacing.lg }}>
 
             {/* Multi-mission tab bar — only shown when >1 aircraft in the air */}
             {liveMissionIds.length > 1 && (
@@ -204,8 +253,8 @@ export default function App() {
                         style={{
                           ...missionTabBtn,
                           borderColor: active ? "rgba(59,130,246,0.50)" : colors.border,
-                          background:  active ? "rgba(59,130,246,0.14)" : "rgba(255,255,255,0.04)",
-                          color:       active ? colors.textPrimary : colors.textSecondary,
+                          background: active ? "rgba(59,130,246,0.14)" : "rgba(255,255,255,0.04)",
+                          color: active ? colors.textPrimary : colors.textSecondary,
                         }}
                       >
                         <span style={livedot} />
@@ -220,13 +269,20 @@ export default function App() {
               </div>
             )}
 
-            <LiveMission
-              key={liveViewId}
-              aircraft={liveViewAircraft}
-              pilotName={user.name}
-              onMissionComplete={(d, s) => handleMissionComplete(liveViewId, d, s)}
-              onAbort={() => handleAbortMission(liveViewId)}
-            />
+            {/* Each live mission stays mounted; only the active one is visible */}
+            {liveMissionIds.map((id) => {
+              const ac = FLEET.find((a) => a.id === id) ?? selectedAircraft;
+              return (
+                <div key={id} style={{ display: id === liveViewId ? "block" : "none" }}>
+                  <LiveMission
+                    aircraft={ac}
+                    pilotName={user.name}
+                    onMissionComplete={(d, s) => handleMissionComplete(id, d, s)}
+                    onAbort={() => handleAbortMission(id)}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -236,21 +292,23 @@ export default function App() {
             detections={currentMission.reportData.detections}
             missionSeconds={currentMission.reportData.seconds}
             pilotName={user.name}
+            existingFlightId={currentMission.liveFlightId}
+            existingAccessCode={currentMission.liveAccessCode}
             onViewHistory={() => setPage("history")}
             onNewMission={handleNewMission}
           />
         )}
 
-        {page === "detection" && (user.role === "Analyst" || currentMission !== undefined) && (
+        {page === "detection" && (
           <DetectionView
             aircraft={selectedAircraft}
-            detections={currentMission?.detections ?? DEMO_DETECTIONS}
+            detections={currentMission?.detections ?? getDetectionsForAircraft(selectedAircraftId)}
           />
         )}
 
         {page === "review" && (
           <ResultsReview
-            missionDetections={currentMission?.detections ?? DEMO_DETECTIONS}
+            missionDetections={currentMission?.detections ?? getDetectionsForAircraft(selectedAircraftId)}
             missionAircraftId={selectedAircraftId}
             onGoHistory={() => setPage("history")}
           />
